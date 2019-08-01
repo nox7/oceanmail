@@ -92,4 +92,78 @@
 
 			return $parsedAddress;
 		}
+
+		/**
+		* Parses a Content-Type header into an array
+		*
+		* @param string $contentTypeHeaderValue
+		* @return array
+		* @throws Exception
+		*/
+		public static function parseContentType(string $contentTypeHeaderValue){
+			$position = 0;
+			$state = "READING CONTENT-TYPE";
+			$currentKey = "content-type";
+
+			$contentType = [
+				"content-type"=>"",
+			];
+
+			while(1){
+				$currentCharacter = mb_substr($contentTypeHeaderValue, $position, 1);
+
+				if ($currentCharacter === "" || $currentCharacter === false){
+					break;
+				}else{
+					if ($currentCharacter === ";"){
+						if ($state === "READING CONTENT-TYPE"){
+							$currentKey = "";
+							$state = "READING NEXT KEY";
+						}elseif ($state === "READING NEXT KEY"){
+							// Found a ; while reading a key, ignore it
+						}elseif ($state === "READING VALUE"){
+							// End of that value, this is not a STRING VALUE so ; signifies the end
+							$currentKey = "";
+							$state = "READING NEXT KEY";
+						}
+					}elseif ($currentCharacter === '"' && $state === "READING STRING VALUE"){
+						$state = "READING NEXT KEY";
+					}elseif ($currentCharacter === "="){
+						if ($state === "READING NEXT KEY"){
+							$state = "READING VALUE";
+							$contentType[$currentKey] = "";
+						}elseif ($state === "READING VALUE"){
+							$contentType[$currentKey] .= $currentCharacter;
+						}else{
+							throw new Exception();
+						}
+					}elseif ($currentCharacter === " " && $state === "READING VALUE"){
+						// Found a space when reading a value and it is not a STRING VALUE,
+						// Ignore it
+					}else{
+						if ($state === "READING NEXT KEY"){
+							if ($currentCharacter != " "){
+								$currentKey .= $currentCharacter;
+							}
+						}elseif ($state === "READING VALUE"){
+							if ($currentCharacter === '"'){
+								// Beginning quote hit when expecting a value, switch to reading a string value
+								$state = "READING STRING VALUE";
+							}else{
+								$contentType[$currentKey] .= $currentCharacter;
+							}
+						}elseif ($state === "READING STRING VALUE"){
+							$contentType[$currentKey] .= $currentCharacter;
+						}elseif ($state === "READING CONTENT-TYPE"){
+							$contentType[$currentKey] .= $currentCharacter;
+						}
+					}
+
+				}
+
+				++$position;
+			}
+
+			return $contentType;
+		}
 	}

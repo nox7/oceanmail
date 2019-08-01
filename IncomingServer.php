@@ -36,7 +36,7 @@
 			}
 		}
 
-		public function startServerLoop(){
+		public function startServerLoop(PostOffice $poBox){
 			socket_listen($this->socket_25);
 
 			$this->currentEnvelope = new Envelope();
@@ -74,7 +74,9 @@
 					}
 				}
 
-				Debug::log("Envelope created:\n" . $this->currentEnvelope, Debug::DEBUG_LEVEL_MEDIUM);
+				$poBox->onMailDroppedOff($this->currentEnvelope);
+				$this->currentEnvelope = null;
+				$this->currentClientSocket = null;
 			}
 		}
 
@@ -105,14 +107,15 @@
 				}elseif (self::isRcptToCommand($loweredInput)){
 					Debug::log("RCPT TO received", Debug::DEBUG_LEVEL_LOW);
 					$value = self::getRcptToValue($inputLine);
-					$toAddress = EmailUtility::parseEmailAddress($value);
-					$this->currentEnvelope->recipientsAddresses[] = $toAddress;
+					$addresses = explode(",", $value);
+					foreach($addresses as $address){
+						$toAddress = EmailUtility::parseEmailAddress($value);
+						$this->currentEnvelope->recipientsAddresses[] = $toAddress;
+					}
 					socket_write($this->currentClientSocket, $this->smtpResponseMessages['ok'], mb_strlen($this->smtpResponseMessages['ok']));
 				}elseif (self::isDataIdentifer($loweredInput)){
 					Debug::log("DATA identifier received", Debug::DEBUG_LEVEL_LOW);
 					$value = self::getRcptToValue($inputLine);
-					$toAddress = EmailUtility::parseEmailAddress($value);
-					$this->currentEnvelope->recipientsAddresses[] = $toAddress;
 					socket_write($this->currentClientSocket, $this->smtpResponseMessages['prepare-for-data'], mb_strlen($this->smtpResponseMessages['prepare-for-data']));
 					$readingState = "READING DATA";
 				}else{
@@ -135,8 +138,11 @@
 					}elseif (self::isDataHeader_To($loweredInput)){
 						Debug::log("Received DATA To header", Debug::DEBUG_LEVEL_LOW);
 						$value = self::getDataHeader_To($inputLine);
-						$toAddress = EmailUtility::parseEmailAddress($value);
-						$this->currentEnvelope->toAddresses_Data[] = $toAddress;
+						$addresses = explode(",", $value);
+						foreach($addresses as $address){
+							$toAddress = EmailUtility::parseEmailAddress($address);
+							$this->currentEnvelope->toAddresses_Data[] = $toAddress;
+						}
 					}elseif (self::isDataHeader_ReturnPath($loweredInput)){
 						Debug::log("Received DATA Return-Path header", Debug::DEBUG_LEVEL_LOW);
 						$value = self::getDataHeader_ReturnPath($inputLine);
@@ -150,6 +156,11 @@
 						Debug::log("Received DATA Subject header", Debug::DEBUG_LEVEL_LOW);
 						$value = self::getDataHeader_Subject($inputLine);
 						$this->currentEnvelope->subject = $value;
+					}elseif (self::isDataHeader_ContentType($loweredInput)){
+						Debug::log("Received DATA Content-Type header", Debug::DEBUG_LEVEL_LOW);
+						$value = self::getDataHeader_ContentType($inputLine);
+						$contentType = EmailUtility::parseContentType($value);
+						$this->currentEnvelope->contentType = $contentType;
 					}else{
 						Debug::log("Received DATA body content", Debug::DEBUG_LEVEL_LOW);
 						$this->currentEnvelope->body .= $inputLine;
@@ -348,5 +359,27 @@
 		*/
 		private static function getDataHeader_Subject(string $inputLine){
 			return ltrim(mb_substr($inputLine, 8));
+		}
+
+		/**
+		* If a string is part of the DATA with a Content-Type header
+		*
+		* @param string $inputLine
+		* @return bool
+		*/
+		private static function isDataHeader_ContentType(string $inputLine){
+			$inputLine = mb_strtolower($inputLine);
+
+			return mb_substr($inputLine, 0, 12) === "content-type";
+		}
+
+		/**
+		* Gets the value of a Content-Type header in the DATA body
+		*
+		* @param string $inputLine This line must not be provided lowered
+		* @return string
+		*/
+		private static function getDataHeader_ContentType(string $inputLine){
+			return ltrim(mb_substr($inputLine, 13));
 		}
 	}

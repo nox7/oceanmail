@@ -17,6 +17,7 @@
 		public $returnPathAddress;
 		public $dateTime;
 		public $subject;
+		public $contentType;
 		public $body;
 
 		public function __tostring(){
@@ -27,6 +28,7 @@
 			$stringified .= "To (DATA header): " . json_encode($this->toAddresses_Data) . "\n";
 			$stringified .= "Return-Path (DATA header): " . $this->returnPathAddress['email'] . "\n";
 			$stringified .= "Date (DATA header): " . $this->dateTime . "\n";
+			$stringified .= "Content-Type (DATA header): " . json_encode($this->contentType) . "\n";
 			$stringified .= "Subject (DATA header): " . $this->subject . "\n";
 			$stringified .= "Body (DATA header): " . $this->body . "\n";
 			return $stringified;
