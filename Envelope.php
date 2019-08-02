@@ -55,7 +55,13 @@
 		* @return void
 		*/
 		public function parseRawDataHeaders(){
-			$headerStrings = explode("\r\n", $this->rawDataHeaders);
+
+			// When lines are wrapped, the first character of a new line in headers is a space
+			// So to unwrap these lines, \r\n\s should be removed
+			$this->rawDataHeaders = str_replace("\r\n ", "", $this->rawDataHeaders);
+
+			print("--- raw headers BEFORE parse: " . json_encode($this->rawDataHeaders));
+			$headerStrings = explode("\n", $this->rawDataHeaders);
 
 			foreach($headerStrings as $str){
 				$str = trim($str);
@@ -177,13 +183,13 @@
 								}
 							}elseif ($parsingState === "PARSING HEADERS"){
 								if ($line !== ""){
-									$currentChildEnvelope->rawDataHeaders .= $line;
+									$currentChildEnvelope->rawDataHeaders .= $line . "\r\n";
 								}else{
 									// Blank line, switch to parsing the body
 									$parsingState = "PARSING BODY";
 								}
 							}elseif ($parsingState === "PARSING BODY"){
-								$currentChildEnvelope->rawBody .= $line;
+								$currentChildEnvelope->rawBody .= $line . "\r\n";
 							}
 						}
 					}
