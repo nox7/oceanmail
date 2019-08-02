@@ -127,14 +127,13 @@
 		public static function parseSemicolonDelimitedValue(string $value, string $initialKey){
 			$position = 0;
 			$state = "READING INITIAL-KEY";
-			$currentKey = &$initialKey;
+			$currentKey = $initialKey;
 
-			$contentType = [
-				$currentKey=>"",
-			];
+			$contentType = [];
+			$contentType[$currentKey] = "";
 
 			while(1){
-				$currentCharacter = mb_substr($initialKey, $position, 1);
+				$currentCharacter = mb_substr($value, $position, 1);
 
 				if ($currentCharacter === "" || $currentCharacter === false){
 					break;

@@ -5,6 +5,8 @@
 	* @author Garet C. Green
 	*/
 
+	require_once __DIR__ . "/Debug.php";
+
 	/**
 	* The envelope (mail) received from the incoming server to be delivered to a local account
 	*/
@@ -38,7 +40,7 @@
 		* @return string
 		*/
 		public function getDataHeader(string $headerName){
-			foreach($dataHeaders as $hName=>$value){
+			foreach($this->dataHeaders as $hName=>$value){
 				if (mb_strtolower($hName) === mb_strtolower($headerName)){
 					return $value;
 				}
@@ -97,6 +99,106 @@
 			}
 		}
 
+		/**
+		* Whether or not the message is multipart
+		*
+		* @return bool
+		*/
+		public function isMultipart(){
+			$contentType = $this->getDataHeader("content-type");
+			print_r($contentType);
+			if ($contentType !== "" && isset($contentType['content-type'])){
+				return preg_match("@multipart\/.+@i", $contentType['content-type']) === 1;
+			}
+
+			return false;
+		}
+
+		/**
+		* Parses a raw body
+		*
+		* If the body has no boundaries, then no child Envelopes are created. Otherwise, child envelopes will be created
+		*
+		* @return void
+		*/
+		public function parseRawBody(){
+			// First check if this is a possible multipart
+			if ($this->isMultipart()){
+				Debug::log("Body is multipart", Debug::DEBUG_LEVEL_LOW);
+				$contentType = $this->getDataHeader("content-type");
+				if (isset($contentType['boundary'])){
+
+					$boundary = $contentType['boundary'];
+
+					Debug::log("Parsing body with boundary: $boundary", Debug::DEBUG_LEVEL_LOW);
+
+					$lines = explode("\r\n", $this->rawBody);
+					$parsingState = "";
+					$currentChildEnvelope;
+
+					foreach($lines as $line){
+
+						Debug::log("Parsing body line: $line", Debug::DEBUG_LEVEL_LOW);
+
+						if ($line === "--$boundary--" || ($parsingState === "PARSING BODY" && $line === "--$boundary")){
+							// End of this boundary, emit the child envelope
+							if (isset($currentChildEnvelope)){
+
+								// Parse the child envelope
+								$currentChildEnvelope->parseRawDataHeaders();
+								$currentChildEnvelope->parseDataHeaders();
+								$currentChildEnvelope->parseRawBody();
+
+								// Add it to this instance's multiparts
+								$this->multiparts[] = $currentChildEnvelope;
+
+								// Set the parent
+								$this->parentEnvelope = $this;
+
+								// Clear the variable
+								$currentChildEnvelope = null;
+							}
+
+							if (($parsingState === "PARSING BODY" && $line === "--$boundary")){
+								// The body parsing previously ended because a new boundary was ran into
+								$parsingState = "PARSING HEADERS";
+								$currentChildEnvelope = new Envelope();
+							}else{
+								$parsingState = "";
+							}
+						}else{
+							if ($parsingState === ""){
+								if ($line === "--$boundary"){
+									$currentChildEnvelope = new Envelope();
+									$parsingState = "PARSING HEADERS";
+								}else{
+									// This means there is text OUTSIDE OF A BOUNDARY
+									// This is invalid text, ignore it
+								}
+							}elseif ($parsingState === "PARSING HEADERS"){
+								if ($line !== ""){
+									$currentChildEnvelope->rawDataHeaders .= $line;
+								}else{
+									// Blank line, switch to parsing the body
+									$parsingState = "PARSING BODY";
+								}
+							}elseif ($parsingState === "PARSING BODY"){
+								$currentChildEnvelope->rawBody .= $line;
+							}
+						}
+					}
+				}else{
+					// No boundary set, cannot handle multipart accurately
+					$this->body = $this->rawBody;
+				}
+
+			}else{
+				// No parsing needed
+				Debug::log("Body is NOT multipart", Debug::DEBUG_LEVEL_LOW);
+				$this->body = $this->rawBody;
+			}
+		}
+
 		public function __tostring(){
 			$stringified = "";
 
@@ -110,6 +212,12 @@
 			$stringified .= "+ raw DATA headers: \n" . $this->rawDataHeaders . "\n";
 			$stringified .= "+ parsed DATA headers: \n" . json_encode($this->dataHeaders) . "\n";
 			$stringified .= "+ Raw body: \n" . $this->rawBody . "\n";
+			$stringified .= "+ parsed body: \n" . $this->body . "\n";
+			$stringified .= "+ Parsed Multiparts (" . count($this->multiparts) . "): \n";
+
+			foreach($this->multiparts as $part){
+				$stringified .= (string)$part;
+			}
 
 			return $stringified;
 		}
