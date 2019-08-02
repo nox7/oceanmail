@@ -52,13 +52,17 @@
 				}
 
 				$this->currentClientSocket = $connectingSocket;
+				socket_set_option($this->currentClientSocket, SOL_SOCKET, SO_RCVTIMEO, ["sec"=>1, "usec"=>0]);
 				Debug::log("Waiting for response from client", Debug::DEBUG_LEVEL_LOW);
 
 				$lineBuffer = ""; // The current input buffer
 				$readFromSocket = true; // Control for the loop
 				$readingState = ""; // Can be blank or "READING DATA"
+				$receivedEndOfData = false; // Whether or not the end of the DATA has been received
+				$receivedBlankCounter = 0; // The amount of times no data was received
 
 				while ($readFromSocket){
+					Debug::log("Waiting for input from client...", Debug::DEBUG_LEVEL_LOW);
 					$input = socket_read($this->currentClientSocket, 1);
 					$lineBuffer .= $input;
 
@@ -66,15 +70,39 @@
 					if (mb_substr($lineBuffer, -2, 2) == "\r\n"){
 						Debug::log("Received complete line from socket: " . $lineBuffer, Debug::DEBUG_LEVEL_LOW);
 						$receivedMessage = $lineBuffer; //rtrim($lineBuffer, "\r\n");
-						$readFromSocket = $this->processLine($receivedMessage, $readingState);
+						$readFromSocket = $this->processLine($receivedMessage, $readingState, $receivedEndOfData);
 						$lineBuffer = "";
 					}else{
+
 						// Consume the input - do nothing yet
 						// TODO limit this character count? So the buffer doesn't fill up or become infinite
+						// Debug::log("(Unprocessed) Received: " . var_dump($lineBuffer), Debug::DEBUG_LEVEL_LOW);
+
+						if ($lineBuffer === ""){
+							// The socket is still open but we have received an empty buffer?
+							// Sometimes mail clients do this after sending the data - did they send the data?
+							if ($receivedEndOfData === true){
+								// Mailgun is notorious for this
+								// Close the socket - this is fine. Everything has been received
+								socket_write($this->currentClientSocket, $this->smtpResponseMessages['bye'], mb_strlen($this->smtpResponseMessages['bye']));
+								socket_close($this->currentClientSocket);
+								$readFromSocket = false;
+							}else{
+								++$receivedBlankCounter;
+								if ($receivedBlankCounter >= 2){
+									// Received no data twice, close this
+									socket_write($this->currentClientSocket, $this->smtpResponseMessages['bye'], mb_strlen($this->smtpResponseMessages['bye']));
+									socket_close($this->currentClientSocket);
+									$readFromSocket = false;
+								}
+							}
+						}
 					}
 				}
 
-				$poBox->onMailDroppedOff($this->currentEnvelope);
+				if ($this->currentEnvelope instanceof Envelope){
+					$poBox->onMailDroppedOff($this->currentEnvelope);
+				}
 				$this->currentEnvelope = null;
 				$this->currentClientSocket = null;
 			}
@@ -87,8 +115,10 @@
 		* @param string &$readingState
 		* @return bool Whether or not to continue reading from the client socket
 		*/
-		private function processLine(string $inputLine, string &$readingState){
+		private function processLine(string $inputLine, string &$readingState, bool &$receivedEndOfData){
 			$loweredInput = mb_strtolower($inputLine);
+
+			Debug::log("Processing: " . trim($inputLine), Debug::DEBUG_LEVEL_LOW);
 
 			if ($readingState === ""){
 				if (self::isQuitCommand($loweredInput)){
@@ -97,6 +127,9 @@
 					return false;
 				}elseif (self::isHeloCommand($loweredInput)){
 					Debug::log("HELO received", Debug::DEBUG_LEVEL_LOW);
+					socket_write($this->currentClientSocket, $this->smtpResponseMessages['helo-response'], mb_strlen($this->smtpResponseMessages['helo-response']));
+				}elseif (self::isEhloCommand($loweredInput)){
+					Debug::log("EHLO received", Debug::DEBUG_LEVEL_LOW);
 					socket_write($this->currentClientSocket, $this->smtpResponseMessages['helo-response'], mb_strlen($this->smtpResponseMessages['helo-response']));
 				}elseif (self::isMailFromCommand($loweredInput)){
 					Debug::log("MAIL FROM received", Debug::DEBUG_LEVEL_LOW);
@@ -126,6 +159,7 @@
 
 				if ($loweredInput === ".\r\n"){
 					// End of input
+					$receivedEndOfData = true;
 					Debug::log("Received end of data identifier (.)", Debug::DEBUG_LEVEL_LOW);
 					socket_write($this->currentClientSocket, $this->smtpResponseMessages['ok'], mb_strlen($this->smtpResponseMessages['ok']));
 					$readingState = "";
@@ -172,6 +206,18 @@
 			$inputLine = mb_strtolower($inputLine);
 
 			return mb_substr($inputLine, 0, 4) === "helo";
+		}
+
+		/**
+		* If a string is a EHLO command
+		*
+		* @param string $inputLine
+		* @return bool
+		*/
+		private static function isEhloCommand(string $inputLine){
+			$inputLine = mb_strtolower($inputLine);
+
+			return mb_substr($inputLine, 0, 4) === "ehlo";
 		}
 
 		/**
