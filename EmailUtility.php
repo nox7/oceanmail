@@ -73,6 +73,8 @@
 							// ERROR
 							throw new Exception();
 						}
+					}elseif ($currentCharacter === "\r" || $currentCharacter === "\n"){
+						// Ignore these
 					}else{
 						// Character consumption
 						if ($state === "READING NAME"){
@@ -91,6 +93,27 @@
 			$parsedAddress['email'] = sprintf("%s@%s", $parsedAddress['account'], $parsedAddress['domain']);
 
 			return $parsedAddress;
+		}
+
+		/**
+		* Handles values that can be multiple email addresses
+		*
+		* @return array[]
+		*/
+		public static function parseEmailAddressList(string $addressList){
+
+			$addressList = explode(",", $addressList);
+			$parsedList = [];
+
+			foreach($addressList as $textualAddress){
+				$textualAddress = trim($textualAddress);
+				if (!empty($textualAddress)){
+					$address = self::parseEmailAddress($textualAddress);
+					$parsedList[] = $address;
+				}
+			}
+
+			return $parsedList;
 		}
 
 		/**
@@ -165,5 +188,44 @@
 			}
 
 			return $contentType;
+		}
+
+		/**
+		* Parses a header as a key and value pair
+		*
+		* @param string $headerString
+		* @return array
+		*/
+		public static function parseHeaderAsKeyValue(string $headerString){
+			$state = "READING KEY";
+			$key = "";
+			$value = "";
+			$position = 0;
+
+			while(1){
+				$currentCharacter = mb_substr($headerString, $position, 1);
+
+				if ($currentCharacter === "" || $currentCharacter === false){
+					break;
+				}else{
+					if ($state === "READING KEY"){
+						if ($currentCharacter === ":"){
+							$state = "READING VALUE";
+						}else{
+							$key .= $currentCharacter;
+						}
+					}elseif ($state === "READING VALUE"){
+						if ($currentCharacter === "\n" || $currentCharacter === "\r"){
+							// Ignore these, they signify the end of the header
+						}else{
+							$value .= $currentCharacter;
+						}
+					}
+				}
+
+				++$position;
+			}
+
+			return [trim($key), trim($value)];
 		}
 	}

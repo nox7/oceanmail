@@ -65,7 +65,7 @@
 					// Check if the buffer has an end-line signifer
 					if (mb_substr($lineBuffer, -2, 2) == "\r\n"){
 						Debug::log("Received complete line from socket: " . $lineBuffer, Debug::DEBUG_LEVEL_LOW);
-						$receivedMessage = rtrim($lineBuffer, "\r\n");
+						$receivedMessage = $lineBuffer; //rtrim($lineBuffer, "\r\n");
 						$readFromSocket = $this->processLine($receivedMessage, $readingState);
 						$lineBuffer = "";
 					}else{
@@ -115,57 +115,36 @@
 					socket_write($this->currentClientSocket, $this->smtpResponseMessages['ok'], mb_strlen($this->smtpResponseMessages['ok']));
 				}elseif (self::isDataIdentifer($loweredInput)){
 					Debug::log("DATA identifier received", Debug::DEBUG_LEVEL_LOW);
-					$value = self::getRcptToValue($inputLine);
 					socket_write($this->currentClientSocket, $this->smtpResponseMessages['prepare-for-data'], mb_strlen($this->smtpResponseMessages['prepare-for-data']));
-					$readingState = "READING DATA";
+					$readingState = "READING DATA HEADERS";
 				}else{
 					Debug::log("Unrecognized data: " . $inputLine, Debug::DEBUG_LEVEL_LOW);
 					socket_close($this->currentClientSocket);
 					return false;
 				}
-			}elseif ($readingState === "READING DATA"){
-				if ($loweredInput === "."){
+			}elseif ($readingState === "READING DATA HEADERS" || $readingState === "READING DATA BODY"){
+
+				if ($loweredInput === ".\r\n"){
 					// End of input
 					Debug::log("Received end of data identifier (.)", Debug::DEBUG_LEVEL_LOW);
 					socket_write($this->currentClientSocket, $this->smtpResponseMessages['ok'], mb_strlen($this->smtpResponseMessages['ok']));
 					$readingState = "";
 				}else{
-					if (self::isDataHeader_From($loweredInput)){
-						Debug::log("Received DATA From header", Debug::DEBUG_LEVEL_LOW);
-						$value = self::getDataHeader_From($inputLine);
-						$fromAddress = EmailUtility::parseEmailAddress($value);
-						$this->currentEnvelope->fromAddress_Data = $fromAddress;
-					}elseif (self::isDataHeader_To($loweredInput)){
-						Debug::log("Received DATA To header", Debug::DEBUG_LEVEL_LOW);
-						$value = self::getDataHeader_To($inputLine);
-						$addresses = explode(",", $value);
-						foreach($addresses as $address){
-							$toAddress = EmailUtility::parseEmailAddress($address);
-							$this->currentEnvelope->toAddresses_Data[] = $toAddress;
+					if ($readingState === "READING DATA HEADERS"){
+						if ($inputLine === "\r\n"){
+							// Blank line, switch to reading body mode
+							$readingState = "READING DATA BODY";
+						}else{
+							$this->currentEnvelope->rawDataHeaders .= $inputLine;
 						}
-					}elseif (self::isDataHeader_ReturnPath($loweredInput)){
-						Debug::log("Received DATA Return-Path header", Debug::DEBUG_LEVEL_LOW);
-						$value = self::getDataHeader_ReturnPath($inputLine);
-						$returnPathAddress = EmailUtility::parseEmailAddress($value);
-						$this->currentEnvelope->returnPathAddress = $returnPathAddress;
-					}elseif (self::isDataHeader_Date($loweredInput)){
-						Debug::log("Received DATA Date header", Debug::DEBUG_LEVEL_LOW);
-						$value = self::getDataHeader_Date($inputLine);
-						$this->currentEnvelope->dateTime = $value;
-					}elseif (self::isDataHeader_Subject($loweredInput)){
-						Debug::log("Received DATA Subject header", Debug::DEBUG_LEVEL_LOW);
-						$value = self::getDataHeader_Subject($inputLine);
-						$this->currentEnvelope->subject = $value;
-					}elseif (self::isDataHeader_ContentType($loweredInput)){
-						Debug::log("Received DATA Content-Type header", Debug::DEBUG_LEVEL_LOW);
-						$value = self::getDataHeader_ContentType($inputLine);
-						$contentType = EmailUtility::parseContentType($value);
-						$this->currentEnvelope->contentType = $contentType;
+					}elseif ($readingState === "READING DATA BODY"){
+						$this->currentEnvelope->rawBody .= $inputLine;
 					}else{
-						Debug::log("Received DATA body content", Debug::DEBUG_LEVEL_LOW);
-						$this->currentEnvelope->body .= $inputLine;
+						Debug::log("DATA read state invalid", Debug::DEBUG_LEVEL_LOW);
 					}
 				}
+			}else{
+				Debug::log("Unknown reading state: $readingState", Debug::DEBUG_LEVEL_LOW);
 			}
 
 			return true;
@@ -252,134 +231,24 @@
 		}
 
 		/**
-		* If a string is part of the DATA with a From header
+		* If a string is a boundary identifier (beginning a muiltipart part) in the DATA body
 		*
 		* @param string $inputLine
+		* @param string $boundary
 		* @return bool
 		*/
-		private static function isDataHeader_From(string $inputLine){
-			$inputLine = mb_strtolower($inputLine);
-
-			return mb_substr($inputLine, 0, 4) === "from";
+		private static function isDataHeader_MultipartBoundary(string $inputLine, string $boundary){
+			return $inputLine === "--$boundary";
 		}
 
 		/**
-		* Gets the value of a From header in the DATA body
-		*
-		* @param string $inputLine This line must not be provided lowered
-		* @return string
-		*/
-		private static function getDataHeader_From(string $inputLine){
-			return ltrim(mb_substr($inputLine, 5));
-		}
-
-		/**
-		* If a string is part of the DATA with a To header
+		* If a string is a boundary END identifier (ending a muiltipart part) in the DATA body
 		*
 		* @param string $inputLine
+		* @param string $boundary
 		* @return bool
 		*/
-		private static function isDataHeader_To(string $inputLine){
-			$inputLine = mb_strtolower($inputLine);
-
-			return mb_substr($inputLine, 0, 2) === "to";
-		}
-
-		/**
-		* Gets the value of a To header in the DATA body
-		*
-		* @param string $inputLine This line must not be provided lowered
-		* @return string
-		*/
-		private static function getDataHeader_To(string $inputLine){
-			return ltrim(mb_substr($inputLine, 3));
-		}
-
-		/**
-		* If a string is part of the DATA with a Return-Path header
-		*
-		* @param string $inputLine
-		* @return bool
-		*/
-		private static function isDataHeader_ReturnPath(string $inputLine){
-			$inputLine = mb_strtolower($inputLine);
-
-			return mb_substr($inputLine, 0, 11) === "return-path";
-		}
-
-		/**
-		* Gets the value of a Return-Path header in the DATA body
-		*
-		* @param string $inputLine This line must not be provided lowered
-		* @return string
-		*/
-		private static function getDataHeader_ReturnPath(string $inputLine){
-			return ltrim(mb_substr($inputLine, 12));
-		}
-
-		/**
-		* If a string is part of the DATA with a Date header
-		*
-		* @param string $inputLine
-		* @return bool
-		*/
-		private static function isDataHeader_Date(string $inputLine){
-			$inputLine = mb_strtolower($inputLine);
-
-			return mb_substr($inputLine, 0, 4) === "date";
-		}
-
-		/**
-		* Gets the value of a Date header in the DATA body
-		*
-		* @param string $inputLine This line must not be provided lowered
-		* @return string
-		*/
-		private static function getDataHeader_Date(string $inputLine){
-			return ltrim(mb_substr($inputLine, 5));
-		}
-
-		/**
-		* If a string is part of the DATA with a Subject header
-		*
-		* @param string $inputLine
-		* @return bool
-		*/
-		private static function isDataHeader_Subject(string $inputLine){
-			$inputLine = mb_strtolower($inputLine);
-
-			return mb_substr($inputLine, 0, 7) === "subject";
-		}
-
-		/**
-		* Gets the value of a Subject header in the DATA body
-		*
-		* @param string $inputLine This line must not be provided lowered
-		* @return string
-		*/
-		private static function getDataHeader_Subject(string $inputLine){
-			return ltrim(mb_substr($inputLine, 8));
-		}
-
-		/**
-		* If a string is part of the DATA with a Content-Type header
-		*
-		* @param string $inputLine
-		* @return bool
-		*/
-		private static function isDataHeader_ContentType(string $inputLine){
-			$inputLine = mb_strtolower($inputLine);
-
-			return mb_substr($inputLine, 0, 12) === "content-type";
-		}
-
-		/**
-		* Gets the value of a Content-Type header in the DATA body
-		*
-		* @param string $inputLine This line must not be provided lowered
-		* @return string
-		*/
-		private static function getDataHeader_ContentType(string $inputLine){
-			return ltrim(mb_substr($inputLine, 13));
+		private static function isDataHeader_MultipartBoundaryEnd(string $inputLine, string $boundary){
+			return $inputLine === "--$boundary--";
 		}
 	}

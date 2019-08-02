@@ -10,27 +10,105 @@
 	*/
 	class Envelope{
 
-		public $fromAddress;
-		public $fromAddress_Data;
-		public $recipientsAddresses;
-		public $toAddresses_Data;
-		public $returnPathAddress;
+		public $fromAddress = "";
+		public $fromAddress_Data = "";
+		public $recipientsAddresses = [];
+		public $toAddresses_Data = [];
+		public $returnPathAddress = "";
+		public $rawDateTime = "";
 		public $dateTime;
-		public $subject;
-		public $contentType;
-		public $body;
+		public $subject = "";
+		public $rawDataHeaders = "";
+		public $dataHeaders = [];
+		public $rawBody = "";
+		public $body = "";
+		public $multiparts = [];
+		public $parentEnvelope = null;
+
+		public function __construct(){
+
+		}
+
+		/**
+		* Gets the value of a header from dataHeaders or a blank string
+		*
+		* This function is case-insensitive
+		*
+		* @param string $headerName
+		* @return string
+		*/
+		public function getDataHeader(string $headerName){
+			foreach($dataHeaders as $hName=>$value){
+				if (mb_strtolower($hName) === mb_strtolower($headerName)){
+					return $value;
+				}
+			}
+
+			return "";
+		}
+
+		/**
+		* Parses the rawDataHeaders into tokenized headers
+		*
+		* @return void
+		*/
+		public function parseRawDataHeaders(){
+			$headerStrings = explode("\r\n", $this->rawDataHeaders);
+
+			foreach($headerStrings as $str){
+				$str = trim($str);
+				if (!empty($str)){
+					$keyValuePair = EmailUtility::parseHeaderAsKeyValue($str);
+					$this->dataHeaders[$keyValuePair[0]] = $keyValuePair[1];
+				}
+			}
+		}
+
+		/**
+		* Parses known data headers into workable types
+		*
+		* @return void
+		*/
+		public function parseDataHeaders(){
+			foreach($this->dataHeaders as $key=>$value){
+
+				$loweredKey = mb_strtolower($key);
+				$newValue = $value;
+
+				if ($loweredKey === "Date"){
+					$newValue = new DateTime($value);
+				}elseif ($loweredKey === "To"){
+					$newValue = EmailUtility::parseEmailAddressList($value);
+				}elseif ($loweredKey === "cc"){
+						$newValue = EmailUtility::parseEmailAddressList($value);
+				}elseif ($loweredKey === "bcc"){
+						$newValue = EmailUtility::parseEmailAddressList($value);
+				}elseif ($loweredKey === "from"){
+					$newValue = EmailUtility::parseEmailAddress($value);
+				}elseif ($loweredKey === "return-path"){
+					$newValue = EmailUtility::parseEmailAddress($value);
+				}elseif ($loweredKey === "content-type"){
+					$newValue = EmailUtility::parseContentType($value);
+				}
+
+				$this->dataHeaders[$key] = $newValue;
+			}
+		}
 
 		public function __tostring(){
 			$stringified = "";
-			$stringified .= "From (command): " . $this->fromAddress['email'] . "\n";
-			$stringified .= "From (DATA header): " . $this->fromAddress_Data['email'] . "\n";
+
+			if (isset($this->fromAddress['email'])){
+				$stringified .= "From (command): " . $this->fromAddress['email'] . "\n";
+			}else{
+				$stringified .= "From (command):";
+			}
+
 			$stringified .= "Recipients (command): " . json_encode($this->recipientsAddresses) . "\n";
-			$stringified .= "To (DATA header): " . json_encode($this->toAddresses_Data) . "\n";
-			$stringified .= "Return-Path (DATA header): " . $this->returnPathAddress['email'] . "\n";
-			$stringified .= "Date (DATA header): " . $this->dateTime . "\n";
-			$stringified .= "Content-Type (DATA header): " . json_encode($this->contentType) . "\n";
-			$stringified .= "Subject (DATA header): " . $this->subject . "\n";
-			$stringified .= "Body (DATA header): " . $this->body . "\n";
+			$stringified .= "+ raw DATA headers: \n" . $this->rawDataHeaders . "\n";
+			$stringified .= "+ parsed DATA headers: \n" . json_encode($this->dataHeaders) . "\n";
+			$stringified .= "+ Raw body: \n" . $this->rawBody . "\n";
+
 			return $stringified;
 		}
 
