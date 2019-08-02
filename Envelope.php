@@ -75,20 +75,22 @@
 				$loweredKey = mb_strtolower($key);
 				$newValue = $value;
 
-				if ($loweredKey === "Date"){
+				if ($loweredKey === "date"){
 					$newValue = new DateTime($value);
-				}elseif ($loweredKey === "To"){
+				}elseif ($loweredKey === "to"){
 					$newValue = EmailUtility::parseEmailAddressList($value);
 				}elseif ($loweredKey === "cc"){
-						$newValue = EmailUtility::parseEmailAddressList($value);
+					$newValue = EmailUtility::parseEmailAddressList($value);
 				}elseif ($loweredKey === "bcc"){
-						$newValue = EmailUtility::parseEmailAddressList($value);
+					$newValue = EmailUtility::parseEmailAddressList($value);
 				}elseif ($loweredKey === "from"){
 					$newValue = EmailUtility::parseEmailAddress($value);
 				}elseif ($loweredKey === "return-path"){
 					$newValue = EmailUtility::parseEmailAddress($value);
 				}elseif ($loweredKey === "content-type"){
-					$newValue = EmailUtility::parseContentType($value);
+					$newValue = EmailUtility::parseSemicolonDelimitedValue($value, 'content-type');
+				}elseif ($loweredKey === "content-disposition"){
+					$newValue = EmailUtility::parseSemicolonDelimitedValue($value, 'content-disposition');
 				}
 
 				$this->dataHeaders[$key] = $newValue;

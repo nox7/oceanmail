@@ -117,29 +117,30 @@
 		}
 
 		/**
-		* Parses a Content-Type header into an array
+		* Parses a Content-Type-like (semicolon delimited with key/value pairs following header into an array
 		*
-		* @param string $contentTypeHeaderValue
+		* @param string $value
+		* @param string $initialKey The initial key to assign the first collected value as
 		* @return array
 		* @throws Exception
 		*/
-		public static function parseContentType(string $contentTypeHeaderValue){
+		public static function parseSemicolonDelimitedValue(string $value, string $initialKey){
 			$position = 0;
-			$state = "READING CONTENT-TYPE";
-			$currentKey = "content-type";
+			$state = "READING INITIAL-KEY";
+			$currentKey = &$initialKey;
 
 			$contentType = [
-				"content-type"=>"",
+				$currentKey=>"",
 			];
 
 			while(1){
-				$currentCharacter = mb_substr($contentTypeHeaderValue, $position, 1);
+				$currentCharacter = mb_substr($initialKey, $position, 1);
 
 				if ($currentCharacter === "" || $currentCharacter === false){
 					break;
 				}else{
 					if ($currentCharacter === ";"){
-						if ($state === "READING CONTENT-TYPE"){
+						if ($state === "READING INITIAL-KEY"){
 							$currentKey = "";
 							$state = "READING NEXT KEY";
 						}elseif ($state === "READING NEXT KEY"){
@@ -177,7 +178,7 @@
 							}
 						}elseif ($state === "READING STRING VALUE"){
 							$contentType[$currentKey] .= $currentCharacter;
-						}elseif ($state === "READING CONTENT-TYPE"){
+						}elseif ($state === "READING INITIAL-KEY"){
 							$contentType[$currentKey] .= $currentCharacter;
 						}
 					}
