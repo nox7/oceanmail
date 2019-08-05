@@ -160,8 +160,13 @@
 					}
 				}
 
-				// Drop the envelope at the post office
+
 				if ($this->currentEnvelope instanceof Envelope){
+
+					// Finalizing the package will run all necessary parsing functions on any raw data
+					$this->currentEnvelope->finalizePackage();
+					
+					// Drop the envelope at the post office
 					$poBox->onMailDroppedOff($this->currentEnvelope);
 				}
 

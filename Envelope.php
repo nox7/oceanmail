@@ -233,6 +233,20 @@
 			}
 		}
 
+		/**
+		* Run parsing and decoding functions on raw data in this Envelope
+		*
+		* This function prepares the Enevelope into a "final" state to be dropped off at a PostOffice object
+		*
+		* @return void
+		*/
+		public function finalizePackage(){
+			$this->parseRawDataHeaders();
+			$this->parseDataHeaders();
+			$this->parseRawBody();
+			$this->decodeQuotedPrintableBodies();
+		}
+
 		public function __tostring(){
 			$stringified = "";
 
