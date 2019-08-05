@@ -20,3 +20,15 @@ You can also run the client.php script to test that mail is actually received wh
 ```php
 php client.php
 ```
+
+## 🕋 How to Handle Incoming Mail
+To add logic that can handle incoming mail (such as storing incoming mail in a database) you would do so in the `PostOffice.php` script and the method ``onMailDroppedOff()``. This method has a parameter for whenever a new Envelope (the incoming mail) is packaged and parsed.
+
+### Reading the Address of A New Envelope
+For instance, if your mail server wanted to make sure mail was delivered to the desired account, OceanMail has parsed the email address for you to extract the account from the email format (account@example.com). Here is an example of getting the recipients (because emails can be addressed to multiple accounts) of an Envelope
+```php
+$mail = ...; // The envelope object
+foreach ($mail->dataHeaders->to as $addressData){
+  print($addressData->account);
+}
+```
