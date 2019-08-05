@@ -67,7 +67,7 @@
 				$str = trim($str);
 				if (!empty($str)){
 					$keyValuePair = EmailUtility::parseHeaderAsKeyValue($str);
-					$this->dataHeaders[$keyValuePair[0]] = $keyValuePair[1];
+					$this->dataHeaders[mb_strtolower($keyValuePair[0])] = $keyValuePair[1];
 				}
 			}
 		}
@@ -101,7 +101,8 @@
 					$newValue = EmailUtility::parseSemicolonDelimitedValue($value, 'content-disposition');
 				}
 
-				$this->dataHeaders[$key] = $newValue;
+				// Always set headers as all lower case
+				$this->dataHeaders[$loweredKey] = $newValue;
 			}
 		}
 
