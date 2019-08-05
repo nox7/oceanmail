@@ -29,6 +29,12 @@ For instance, if your mail server wanted to make sure mail was delivered to the 
 ```php
 $mail = ...; // The envelope object
 foreach ($mail->dataHeaders->to as $addressData){
-  print($addressData->account);
+  print($addressData->account . "\n");
 }
+```
+
+The example output of an Envelope that was addressed to account1@example.com and hello@example.com would be
+```
+account1
+hello
 ```
