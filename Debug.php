@@ -34,9 +34,11 @@
 		*/
 		public static function log(string $message, int $debugLevel){
 
-			if ($debugLevel >= self::DEBUG_LEVEL){
-				print(sprintf("%s\n", $message));
+			if (self::DEBUG_ON === true){
+				if ($debugLevel >= self::DEBUG_LEVEL){
+					print(sprintf("%s\n", $message));
+				}
 			}
-			
+
 		}
 	}
