@@ -28,6 +28,7 @@
 			$mail->parseRawDataHeaders();
 			$mail->parseDataHeaders();
 			$mail->parseRawBody();
+			$mail->decodeQuotedPrintableBodies();
 			Debug::log("Envelope received:\n" . $mail, Debug::DEBUG_LEVEL_MEDIUM);
 		}
 	}
