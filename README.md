@@ -1,4 +1,4 @@
-# 📮 OceanMail - Mail Exchange Server for PHP
+# 📮 OceanMail (v0.1.0) - Mail Exchange Server for PHP
 
 OceanMail is a standalone PHP-coded mail exchange server that you can run on your own Linux servers to handle incoming emails in an object-oriented way.
 
