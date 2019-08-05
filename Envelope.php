@@ -12,24 +12,29 @@
 	*/
 	class Envelope{
 
+		/** @var string The From address as sent by the SMTP FROM command */
 		public $fromAddress = "";
-		public $fromAddress_Data = "";
+
+		/** @var string The recipient addresses found in the RCPT TO command */
 		public $recipientsAddresses = [];
-		public $toAddresses_Data = [];
-		public $returnPathAddress = "";
-		public $rawDateTime = "";
-		public $dateTime;
-		public $subject = "";
+
+		/** @var string The raw headers sent in the DATA */
 		public $rawDataHeaders = "";
+
+		/** @var mixed[] The parsed headers compiled from rawDataHeaders */
 		public $dataHeaders = [];
+
+		/** @var string The raw body of the message - no parsing done so even multipart boundaries are still raw */
 		public $rawBody = "";
+
+		/** @var string The parsed body. Encodings should be decoded here. This will be blank if only multipart boundaries were bundled in the rawBody because multiparts[] will be populated with child Envelopes instead. */
 		public $body = "";
+
+		/** @var Envelope[] Child enevelopes created from multipart boundaries */
 		public $multiparts = [];
+
+		/** @var Envelope The parent envelope if this Envelope instance is a child (a multipart part) */
 		public $parentEnvelope = null;
-
-		public function __construct(){
-
-		}
 
 		/**
 		* Gets the value of a header from dataHeaders or a blank string
