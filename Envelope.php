@@ -30,7 +30,7 @@
 		/** @var string The parsed body. Encodings should be decoded here. This will be blank if only multipart boundaries were bundled in the rawBody because multiparts[] will be populated with child Envelopes instead. */
 		public $body = "";
 
-		/** @var Envelope[] Child enevelopes created from multipart boundaries */
+		/** @var Envelope[] Child envelopes created from multipart boundaries */
 		public $multiparts = [];
 
 		/** @var Envelope The parent envelope if this Envelope instance is a child (a multipart part) */
