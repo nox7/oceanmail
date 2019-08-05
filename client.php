@@ -1,10 +1,7 @@
 <?php
-	// // Send basic text
-	// mail("test@localhost.com", "Test Email", "Content", [
-	// 	"From"=>"test@example.com",
-	// 	"Return-Path"=>"garet@footbridgemedia.com",
-	// 	"Content-Type"=>"text/html; charset=UTF-8;",
-	// ]);
+
+	$htmlPartMessage = "<div><strong>Hello</strong><br><div class=\"div2\"></div></div><br><div>Plain text inside of a div</div><br>";
+	$htmlDoubleQuotedEncode = quoted_printable_encode($htmlPartMessage);
 
 	// Send multipart/mixed
 	$boundary = "oceanmailboundary" . time();
@@ -20,13 +17,19 @@
 	$message .= $eol;
 	$message .= $eol . $inTextBoundary . $eol;
 	$message .= "Content-Type: text/html; charset=utf-8" . $eol;
+	$message .= "Content-Transfer-Encoding: quoted-printable" . $eol;
 	$message .= $eol;
-	$message .= "<strong>Html text</strong>";
+	$message .= $htmlDoubleQuotedEncode;
 	$message .= $eol;
 	$message .= $eol . $endBoundary . $eol;
 
 	mail("test@localhost.com", "Test Email", $message, [
 		"From"=>"test@example.com",
-		"Return-Path"=>"garet@footbridgemedia.com",
+		"Return-Path"=>"garet@lumenshield.com",
 		"Content-Type"=>"multipart/mixed; charset=UTF-8; boundary=\"$boundary\"",
 	]);
+
+	// imap_mail("test@localhost.com", "Test IMAP Email", "Test Body", [
+	// 	"From"=>"test@localhost.com",
+	// 	"Return-Path"=>"garet@lumenshield.com",
+	// ]);
