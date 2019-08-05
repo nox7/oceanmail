@@ -21,8 +21,11 @@
 		/** @var string The raw headers sent in the DATA */
 		public $rawDataHeaders = "";
 
-		/** @var mixed[] The parsed headers compiled from rawDataHeaders */
+		/** @var string[] The headers compiled from rawDataHeaders */
 		public $dataHeaders = [];
+
+		/** @var mixed[] The parsed headers compiled from rawDataHeaders */
+		public $parsedDataHeaders = [];
 
 		/** @var string The raw body of the message - no parsing done so even multipart boundaries are still raw */
 		public $rawBody = "";
@@ -45,7 +48,7 @@
 		* @return string
 		*/
 		public function getDataHeader(string $headerName){
-			foreach($this->dataHeaders as $hName=>$value){
+			foreach($this->parsedDataHeaders as $hName=>$value){
 				if (mb_strtolower($hName) === mb_strtolower($headerName)){
 					return $value;
 				}
@@ -104,10 +107,12 @@
 					$newValue = EmailUtility::parseSemicolonDelimitedValue($value, 'content-type');
 				}elseif ($loweredKey === "content-disposition"){
 					$newValue = EmailUtility::parseSemicolonDelimitedValue($value, 'content-disposition');
+				}elseif ($loweredKey === "dkim-signature"){
+					$newValue = EmailUtility::parseSemicolonDelimitedValue($value, '');
 				}
 
 				// Always set headers as all lower case
-				$this->dataHeaders[$loweredKey] = $newValue;
+				$this->parsedDataHeaders[$loweredKey] = $newValue;
 			}
 		}
 
