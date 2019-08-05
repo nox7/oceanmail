@@ -85,7 +85,7 @@
 				$this->currentEnvelope = new Envelope();
 
 				// Set a maximum time to wait for input in socket_read()
-				socket_set_option($this->currentClientSocket, SOL_SOCKET, SO_RCVTIMEO, ["sec"=>0, "usec"=>250]);
+				socket_set_option($this->currentClientSocket, SOL_SOCKET, SO_RCVTIMEO, ["sec"=>2, "usec"=>0]);
 
 				Debug::log("Waiting for response from client", Debug::DEBUG_LEVEL_LOW);
 
@@ -97,7 +97,7 @@
 
 				// Continue attempting to read from the socket until $readFromSocket is set to false
 				while ($readFromSocket){
-					Debug::log("Waiting for input from client...", Debug::DEBUG_LEVEL_LOW);
+					// Debug::log("Waiting for input from client...", Debug::DEBUG_LEVEL_LOW);
 
 					// Blocking-read
 					$input = socket_read($this->currentClientSocket, 1);
@@ -165,7 +165,7 @@
 
 					// Finalizing the package will run all necessary parsing functions on any raw data
 					$this->currentEnvelope->finalizePackage();
-					
+
 					// Drop the envelope at the post office
 					$poBox->onMailDroppedOff($this->currentEnvelope);
 				}
