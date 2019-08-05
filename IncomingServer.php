@@ -10,7 +10,7 @@
 	require_once __DIR__ . "/EmailUtility.php";
 
 	/**
-	* Handles binding and accepting messages via sockets
+	* Handles binding and accepting messages via sockets. Will deliver complete Envelopes to a PostOffice
 	*/
 	class IncomingServer{
 
