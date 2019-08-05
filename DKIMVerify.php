@@ -126,7 +126,7 @@
 
 				Debug::log("DKIM canonicalized body ($bodyCanonicalizeType): $canonicalizedBody", Debug::DEBUG_LEVEL_LOW);
 
-				$hashedBody = hash($hashMethod, $canonicalizedBody);
+				$hashedBody = base64_encode(hash($hashMethod, $canonicalizedBody, true));
 
 				Debug::log("Hashed body: $hashedBody", Debug::DEBUG_LEVEL_LOW);
 				Debug::log("DKIM signature hashed body: " . $dkimSignature['bh'], Debug::DEBUG_LEVEL_LOW);
