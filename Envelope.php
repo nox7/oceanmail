@@ -206,6 +206,28 @@
 			}
 		}
 
+		/**
+		* Recursively decodes all quoted-printable body properties (dives into multiparts and their multiparts)
+		*
+		* @return void
+		*/
+		public function decodeQuotedPrintableBodies(){
+			$transferEncoding = $this->getDataHeader("content-transfer-encoding");
+			if ($transferEncoding === "quoted-printable"){
+
+				// Decode the quoted printable message
+				$this->body = quoted_printable_decode($this->body);
+
+			}
+
+			// Recursively check all child multiparts
+			if (count($this->multiparts)){
+				foreach ($this->multiparts as $envelope){
+					$envelope->decodeQuotedPrintableBodies();
+				}
+			}
+		}
+
 		public function __tostring(){
 			$stringified = "";
 
