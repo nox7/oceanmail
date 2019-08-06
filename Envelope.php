@@ -98,7 +98,7 @@
 			foreach($headerStrings as $rawLine){
 				if ($rawLine !== ""){
 					Debug::log("Parsing raw header line: $rawLine", Debug::DEBUG_LEVEL_LOW);
-					if (substr($rawLine, 0, 1) === " "){
+					if (preg_match("/^\s/", $rawLine) === 1){
 						// First line was a space, this means it is a continuation of the previous key
 						$this->dataHeaders[$lastKey] .= "\r\n" . $rawLine;
 					}else{
@@ -260,7 +260,7 @@
 		* @return void
 		*/
 		public function decodeQuotedPrintableBodies(){
-			$transferEncoding = $this->getDataHeader("content-transfer-encoding");
+			$transferEncoding = trim($this->getDataHeader("content-transfer-encoding"));
 			if ($transferEncoding === "quoted-printable"){
 
 				// Decode the quoted printable message
@@ -302,7 +302,8 @@
 
 			$stringified .= "Recipients (command): " . json_encode($this->recipientsAddresses) . "\n";
 			$stringified .= "+ raw DATA headers: \n" . $this->rawDataHeaders . "\n";
-			$stringified .= "+ parsed DATA headers: \n" . json_encode($this->dataHeaders) . "\n";
+			$stringified .= "+ DATA headers: \n" . json_encode($this->dataHeaders) . "\n";
+			$stringified .= "+ parsed DATA headers: \n" . json_encode($this->parsedDataHeaders) . "\n";
 			$stringified .= "+ Raw body: \n" . $this->rawBody . "\n";
 			$stringified .= "+ parsed body: \n" . $this->body . "\n";
 			$stringified .= "+ Parsed Multiparts (" . count($this->multiparts) . "): \n";

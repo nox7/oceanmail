@@ -24,7 +24,7 @@
 	$message .= $eol . $endBoundary . $eol;
 
 	mail("test@localhost.com", "Test Email", $message, [
-		"From"=>"test@example.com",
+		"From"=>"\"irishiibis@gmail.com\" <test@example.com>",
 		"Return-Path"=>"garet@lumenshield.com",
 		"Content-Type"=>"multipart/mixed; charset=UTF-8; boundary=\"$boundary\"",
 	]);

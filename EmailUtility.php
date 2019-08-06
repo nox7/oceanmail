@@ -19,6 +19,7 @@
 		*/
 		public static function parseEmailAddress(string $address){
 			$position = 0;
+			$isInQuotesFlag = false; // Whether or not the parser is inside quotations
 			$state = "READING NAME";
 			$parsedAddress = [
 				"name"=>"",
@@ -42,27 +43,37 @@
 							throw new Exception();
 						}
 					}elseif ($currentCharacter === "\""){
-						// A pair of quotes may be surrounding the name
-						if ($state === "READING NAME"){
-							// This is fine, ignore it and do not consume
+
+						// Toggle the flag of being in quotes
+						// Do not emit this token, consume it
+						if (!$isInQuotesFlag){
+							$isInQuotesFlag = true;
 						}else{
-							// ERROR
-							throw new Exception();
+							$isInQuotesFlag = false;
 						}
+
 					}elseif ($currentCharacter === "@"){
 						// Begin parsing domain
 						if ($state === "READING ACCOUNT"){
 							$state = "READING DOMAIN";
 						}elseif ($state === "READING NAME"){
-							// The lexer thought it was consuming a name - it was actually an account
-							// This happens on formats such as : example@example.com
-							// Which are not marked by <>'s
-							$parsedAddress['account'] = $parsedAddress['name'];
-							$parsedAddress['name'] = "";
-							$state = "READING DOMAIN";
+
+							// Found an @ symbol while reading the name
+							if ($isInQuotesFlag){
+								// The parser is inside quotation, this is still a name. Continue to consume
+								$parsedAddress['name'] .= $currentCharacter;
+							}else{
+								// Found an @ while not in quotes but thought it was reading a name
+								// This means that there never was a name and only an address
+								// Swap the values AND the state
+								$parsedAddress['account'] = $parsedAddress['name'];
+								$parsedAddress['name'] = "";
+								$state = "READING DOMAIN";
+							}
+
 						}else{
 							// ERROR
-							throw new Exception();
+							throw new Exception("Encountered @ symbol while not reading account or name");
 						}
 					}elseif ($currentCharacter === ">"){
 						// End of address entirely
@@ -75,6 +86,16 @@
 						}
 					}elseif ($currentCharacter === "\r" || $currentCharacter === "\n"){
 						// Ignore these
+					}elseif ($currentCharacter === " "){
+						// A space character should only be emitted when in quotes, otherwise it is consume
+						if ($isInQuotesFlag){
+							// Additionally, it should only be consumed for a name
+							if ($state === "READING NAME"){
+								$parsedAddress['name'] .= $currentCharacter;
+							}
+						}else{
+							// Ignored
+						}
 					}else{
 						// Character consumption
 						if ($state === "READING NAME"){
@@ -171,7 +192,9 @@
 						// Ignore it
 					}else{
 						if ($state === "READING NEXT KEY"){
-							if ($currentCharacter != " "){
+
+							// If it is not whitespace
+							if (preg_match("/\s/", $currentCharacter) !== 1){
 								$currentKey .= $currentCharacter;
 							}
 						}elseif ($state === "READING VALUE"){
@@ -179,7 +202,10 @@
 								// Beginning quote hit when expecting a value, switch to reading a string value
 								$state = "READING STRING VALUE";
 							}else{
-								$contentType[$currentKey] .= $currentCharacter;
+								// If it is not whitespace
+								if (preg_match("/\s/", $currentCharacter) !== 1){
+									$contentType[$currentKey] .= $currentCharacter;
+								}
 							}
 						}elseif ($state === "READING STRING VALUE"){
 							$contentType[$currentKey] .= $currentCharacter;
