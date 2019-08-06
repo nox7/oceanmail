@@ -26,7 +26,7 @@
 			$publicKey; // Will be an array of the _domainkey TXT record
 
 			if (is_array($dkimSignature)){
-				Debug::log("Found DKIM signature", Debug::DEBUG_LEVEL_LOW);
+				Debug::log("Found DKIM signature: " . json_encode($dkimSignature), Debug::DEBUG_LEVEL_LOW);
 
 				// Verify that all necessary keys are in the signature
 				foreach(self::REQUIRED_KEYS as $requiredKey){
@@ -58,9 +58,13 @@
 				// 0th index is the query type and 1st is query format
 				$queryTypeData = explode('/', $queryType);
 
+				Debug::log("Query type q= found as: " . json_encode($queryTypeData), Debug::DEBUG_LEVEL_LOW);
+
 				// DNS query
 				if ($queryTypeData[0] === "dns"){
+					Debug::log("Query type is DNS", Debug::DEBUG_LEVEL_LOW);
 					if ($queryTypeData[1] === "txt"){
+						Debug::log("Query type is TXT", Debug::DEBUG_LEVEL_LOW);
 						// TXT record query
 						$publicKey = self::getPublicKey($dkimSignature['d'], $dkimSignature['s']);
 
@@ -91,17 +95,55 @@
 				// Get the algorithm and hash from the a parameter
 				list($algorithm, $hashMethod) = explode("-", $dkimSignature['a']);
 
+				// Fetch the headers that are signed in the DKIM's b=
+				$signedHeaders = explode(":", $dkimSignature['h']);
+				Debug::log("DKIM-Signature has told the system that these headers are signed: " . json_encode($signedHeaders), Debug::DEBUG_LEVEL_LOW);
+
+				// Make an array of the signed header names but in lowered context for comparison (RFC requirement)
+				$signedHeaders_loweredHeaders = [];
+				foreach($signedHeaders as $hName){
+					$signedHeaders_loweredHeaders[] = mb_strtolower($hName);
+				}
+
 				// Canonicalize the headers
 				$canonicalizedHeader = "";
 				if ($headerCanonicalizeType === "simple"){
-					$canonicalizedHeader = $mail->rawDataHeaders;
+
+					// The canonicalized headers must be in the order of signedHeaders, so this weird method was invented
+					foreach($signedHeaders_loweredHeaders as $neededLoweredHeaderName){
+						foreach($mail->dataHeaders as $headerName=>$headerValue){
+							if (mb_strtolower($headerName) === $neededLoweredHeaderName){
+								$canonicalizedHeader .= sprintf("%s:%s\r\n", $headerName, rtrim($headerValue, "\r\n"));
+							}
+						}
+					}
+
 				}elseif ($headerCanonicalizeType === "relaxed"){
-					foreach($mail->dataHeaders as $header=>$value){
-						$canonicalizedHeader .= sprintf("%s:%s", mb_strtolower($header), preg_replace("/[\s]{2,}/", " ", $value));
+					print_r($mail->dataHeaders);
+					print_r($signedHeaders_loweredHeaders);
+
+					$signedHeaders_loweredHeaders[] = "dkim-signature";
+
+					// The canonicalized headers must be in the order of signedHeaders, so this weird method was invented
+					foreach($signedHeaders_loweredHeaders as $neededLoweredHeaderName){
+						foreach($mail->dataHeaders as $headerName=>$headerValue){
+							if (mb_strtolower($headerName) === $neededLoweredHeaderName){
+								Debug::log("Unfolding header value ($headerName): " . $headerValue, Debug::DEBUG_LEVEL_LOW);
+								$headerValue = rtrim(Emailutility::unfoldHeaderValue($headerValue));
+								$headerValue = preg_replace("/[\s]{2,}/", " ", $headerValue);
+								$canonicalizedHeader .= sprintf("%s:%s\r\n", $neededLoweredHeaderName, trim(rtrim($headerValue, "\r\n")));
+
+								if ($neededLoweredHeaderName === "dkim-signature"){
+									$canonicalizedHeader = preg_replace("/b=[^\r\n]+/", "b=", $canonicalizedHeader);
+								}
+							}
+						}
 					}
 				}
 
-				Debug::log("DKIM canonicalized header ($headerCanonicalizeType): $canonicalizedHeader", Debug::DEBUG_LEVEL_LOW);
+				$canonicalizedHeader = rtrim($canonicalizedHeader, "\r\n");
+
+				Debug::log("DKIM canonicalized header ($headerCanonicalizeType): " . $canonicalizedHeader, Debug::DEBUG_LEVEL_LOW);
 
 				// Canonicalize the body
 				$canonicalizedBody = "";
@@ -140,9 +182,32 @@
 					Debug::log("DKIM body hashes match!", Debug::DEBUG_LEVEL_LOW);
 				}
 
+
+				// Create a .pem version of the public key provided provided
+				$pemKey = sprintf("-----BEGIN PUBLIC KEY-----\n%s\n-----END PUBLIC KEY-----", wordwrap($publicKey, 64, "\n", true));
+				Debug::log("Public PEM is: \n" . $pemKey, Debug::DEBUG_LEVEL_LOW);
+
+				Debug::log("Base64 encoded b= is: " . json_encode($dkimSignature['b']), Debug::DEBUG_LEVEL_LOW);
+				Debug::log("Base64 decoded b= is: " . json_encode(base64_decode($dkimSignature['b'])), Debug::DEBUG_LEVEL_LOW);
+
+				$algorithm = constant("OPENSSL_ALGO_" . strtoupper($hashMethod));
+				$isSignatureCorrect = openssl_verify($canonicalizedHeader, base64_decode($dkimSignature['b']), $pemKey, $algorithm);
+
+				if ($isSignatureCorrect === 1){
+					Debug::log("Header signature matched!: " . $pemKey, Debug::DEBUG_LEVEL_LOW);
+				}else{
+					Debug::log("Header signature did not match computed PEM signature", Debug::DEBUG_LEVEL_LOW);
+					return [
+						"status"=>"permfail",
+						"reason"=>"Header signature could not be verified"
+					];
+				}
+
 			}else{
 				Debug::log("No DKIM signature: $dkimSignature", Debug::DEBUG_LEVEL_LOW);
 			}
+
+
 		}
 
 		/**
@@ -160,10 +225,19 @@
 				return "";
 			}
 
-			if (isset($txtRecord['entries'])){
-				$txtRecord['txt'] = implode("", $txtRecord['entries']);
-				$txtRecord = EmailUtility::parseSemicolonDelimitedValue($txtRecord['txt']);
+			$txtRecord = $txtRecord[0];
+
+			Debug::log("Fetched TXT record: " . json_encode($txtRecord), Debug::DEBUG_LEVEL_LOW);
+			$txtEntries = EmailUtility::parseSemicolonDelimitedValue($txtRecord['txt'], "");
+			Debug::log("Parsed TXT record value: " . json_encode($txtEntries), Debug::DEBUG_LEVEL_LOW);
+
+			if (isset($txtEntries)){
+				Debug::log("Found public key: " . $txtEntries['p'], Debug::DEBUG_LEVEL_LOW);
+				return $txtEntries['p'];
+			}else{
+				return "";
 			}
+
 		}
 
 	}

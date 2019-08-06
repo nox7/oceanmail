@@ -21,7 +21,7 @@
 		/** @var string The raw headers sent in the DATA */
 		public $rawDataHeaders = "";
 
-		/** @var string[] The headers compiled from rawDataHeaders */
+		/** @var string[] The headers compiled from rawDataHeaders. Case is unchanged here and whitespace is preserved */
 		public $dataHeaders = [];
 
 		/** @var mixed[] The parsed headers compiled from rawDataHeaders */
@@ -40,7 +40,7 @@
 		public $parentEnvelope = null;
 
 		/**
-		* Gets the value of a header from dataHeaders or a blank string
+		* Gets the value of a header from parsedDataHeaders or a blank string
 		*
 		* This function is case-insensitive
 		*
@@ -58,6 +58,24 @@
 		}
 
 		/**
+		* Gets the value of a header from dataHeaders or a blank string
+		*
+		* This function is case-insensitive
+		*
+		* @param string $headerName
+		* @return string
+		*/
+		public function getUnparsedDataHeader(string $headerName){
+			foreach($this->dataHeaders as $hName=>$value){
+				if (mb_strtolower($hName) === mb_strtolower($headerName)){
+					return $value;
+				}
+			}
+
+			return "";
+		}
+
+		/**
 		* Parses the rawDataHeaders into tokenized headers
 		*
 		* @return void
@@ -66,16 +84,29 @@
 
 			// When lines are wrapped, the first character of a new line in headers is a space
 			// So to unwrap these lines, \r\n\s should be removed
-			$this->rawDataHeaders = str_replace("\r\n ", "", $this->rawDataHeaders);
 
-			print("--- raw headers BEFORE parse: " . json_encode($this->rawDataHeaders));
-			$headerStrings = explode("\n", $this->rawDataHeaders);
+			// dataHeaders must remained folder for DKIM verifying
+			// $this->rawDataHeaders = str_replace("\r\n ", "", $this->rawDataHeaders);
 
-			foreach($headerStrings as $str){
-				$str = trim($str);
-				if (!empty($str)){
-					$keyValuePair = EmailUtility::parseHeaderAsKeyValue($str);
-					$this->dataHeaders[mb_strtolower($keyValuePair[0])] = $keyValuePair[1];
+			$headerStrings = explode("\r\n", $this->rawDataHeaders);
+			$lastKey; // The last header key created
+
+			foreach($headerStrings as $rawLine){
+				if ($rawLine !== ""){
+					Debug::log("Parsing raw header line: $rawLine", Debug::DEBUG_LEVEL_LOW);
+					if (substr($rawLine, 0, 1) === " "){
+						// First line was a space, this means it is a continuation of the previous key
+						Debug::log("Appending raw header line to previous key: $rawLine", Debug::DEBUG_LEVEL_LOW);
+						$this->dataHeaders[$lastKey] .= "\r\n" . $rawLine;
+					}else{
+						// This is a new key line
+						// The key is defined until the first colon (but not including that colon)
+						preg_match("/^(.+?):(.*)/", $rawLine, $matches);
+						Debug::log("Raw header PREG match: " . json_encode($matches), Debug::DEBUG_LEVEL_LOW);
+						$lastKey = $matches[1];
+						$value = $matches[2];
+						$this->dataHeaders[$lastKey] = $value;
+					}
 				}
 			}
 		}
@@ -83,13 +114,18 @@
 		/**
 		* Parses known data headers into workable types
 		*
+		* All folder header values will be unfolded here
+		*
 		* @return void
 		*/
 		public function parseDataHeaders(){
 			foreach($this->dataHeaders as $key=>$value){
 
+				// Remove any \r\n from the value
+				$value = str_replace("\r\n", "", $value);
+
 				$loweredKey = mb_strtolower($key);
-				$newValue = $value;
+				$newValue = EmailUtility::unfoldHeaderValue($value);
 
 				if ($loweredKey === "date"){
 					$newValue = new DateTime($value);

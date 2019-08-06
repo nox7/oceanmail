@@ -234,4 +234,14 @@
 
 			return [trim($key), trim($value)];
 		}
+
+		/**
+		* Unfolds a header value by removing \r\n from \r\n\s
+		*
+		* @param string $headerValue
+		* @return string
+		*/
+		public static function unfoldHeaderValue(string $headerValue){
+			return str_replace("\r\n ", " ", $headerValue);
+		}
 	}
