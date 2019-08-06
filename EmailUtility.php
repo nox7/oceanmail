@@ -130,7 +130,13 @@
 			$currentKey = $initialKey;
 
 			$contentType = [];
-			$contentType[$currentKey] = "";
+
+			// The currentKey could be empty, signifying there is no initial key (such as with dkim-signature)
+			if (!empty($currentKey)){
+				$contentType[$currentKey] = "";
+			}else{
+				$state = "READING NEXT KEY";
+			}
 
 			while(1){
 				$currentCharacter = mb_substr($value, $position, 1);
@@ -158,7 +164,7 @@
 						}elseif ($state === "READING VALUE"){
 							$contentType[$currentKey] .= $currentCharacter;
 						}else{
-							throw new Exception();
+							throw new Exception("Unexpected = character during state: $state");
 						}
 					}elseif ($currentCharacter === " " && $state === "READING VALUE"){
 						// Found a space when reading a value and it is not a STRING VALUE,
@@ -227,5 +233,15 @@
 			}
 
 			return [trim($key), trim($value)];
+		}
+
+		/**
+		* Unfolds a header value by removing \r\n from \r\n\s
+		*
+		* @param string $headerValue
+		* @return string
+		*/
+		public static function unfoldHeaderValue(string $headerValue){
+			return str_replace("\r\n ", " ", $headerValue);
 		}
 	}

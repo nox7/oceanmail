@@ -6,6 +6,7 @@
 	*/
 
 	require_once __DIR__ . "/Debug.php";
+	require_once __DIR__ . "/DKIMVerify.php";
 
 	/**
 	* The envelope (mail) received from the incoming server to be delivered to a local account
@@ -21,8 +22,11 @@
 		/** @var string The raw headers sent in the DATA */
 		public $rawDataHeaders = "";
 
-		/** @var mixed[] The parsed headers compiled from rawDataHeaders */
+		/** @var string[] The headers compiled from rawDataHeaders. Case is unchanged here and whitespace is preserved */
 		public $dataHeaders = [];
+
+		/** @var mixed[] The parsed headers compiled from rawDataHeaders */
+		public $parsedDataHeaders = [];
 
 		/** @var string The raw body of the message - no parsing done so even multipart boundaries are still raw */
 		public $rawBody = "";
@@ -36,6 +40,27 @@
 		/** @var Envelope The parent envelope if this Envelope instance is a child (a multipart part) */
 		public $parentEnvelope = null;
 
+		/** @var array The results of the DKIM verification process */
+		public $dkimVerificationResults = [];
+
+		/**
+		* Gets the value of a header from parsedDataHeaders or a blank string
+		*
+		* This function is case-insensitive
+		*
+		* @param string $headerName
+		* @return string
+		*/
+		public function getDataHeader(string $headerName){
+			foreach($this->parsedDataHeaders as $hName=>$value){
+				if (mb_strtolower($hName) === mb_strtolower($headerName)){
+					return $value;
+				}
+			}
+
+			return "";
+		}
+
 		/**
 		* Gets the value of a header from dataHeaders or a blank string
 		*
@@ -44,7 +69,7 @@
 		* @param string $headerName
 		* @return string
 		*/
-		public function getDataHeader(string $headerName){
+		public function getUnparsedDataHeader(string $headerName){
 			foreach($this->dataHeaders as $hName=>$value){
 				if (mb_strtolower($hName) === mb_strtolower($headerName)){
 					return $value;
@@ -63,16 +88,27 @@
 
 			// When lines are wrapped, the first character of a new line in headers is a space
 			// So to unwrap these lines, \r\n\s should be removed
-			$this->rawDataHeaders = str_replace("\r\n ", "", $this->rawDataHeaders);
 
-			print("--- raw headers BEFORE parse: " . json_encode($this->rawDataHeaders));
-			$headerStrings = explode("\n", $this->rawDataHeaders);
+			// dataHeaders must remained folder for DKIM verifying
+			// $this->rawDataHeaders = str_replace("\r\n ", "", $this->rawDataHeaders);
 
-			foreach($headerStrings as $str){
-				$str = trim($str);
-				if (!empty($str)){
-					$keyValuePair = EmailUtility::parseHeaderAsKeyValue($str);
-					$this->dataHeaders[mb_strtolower($keyValuePair[0])] = $keyValuePair[1];
+			$headerStrings = explode("\r\n", $this->rawDataHeaders);
+			$lastKey; // The last header key created
+
+			foreach($headerStrings as $rawLine){
+				if ($rawLine !== ""){
+					Debug::log("Parsing raw header line: $rawLine", Debug::DEBUG_LEVEL_LOW);
+					if (substr($rawLine, 0, 1) === " "){
+						// First line was a space, this means it is a continuation of the previous key
+						$this->dataHeaders[$lastKey] .= "\r\n" . $rawLine;
+					}else{
+						// This is a new key line
+						// The key is defined until the first colon (but not including that colon)
+						preg_match("/^(.+?):(.*)/", $rawLine, $matches);
+						$lastKey = $matches[1];
+						$value = $matches[2];
+						$this->dataHeaders[$lastKey] = $value;
+					}
 				}
 			}
 		}
@@ -80,13 +116,18 @@
 		/**
 		* Parses known data headers into workable types
 		*
+		* All folder header values will be unfolded here
+		*
 		* @return void
 		*/
 		public function parseDataHeaders(){
 			foreach($this->dataHeaders as $key=>$value){
 
+				// Remove any \r\n from the value
+				$value = str_replace("\r\n", "", $value);
+
 				$loweredKey = mb_strtolower($key);
-				$newValue = $value;
+				$newValue = EmailUtility::unfoldHeaderValue($value);
 
 				if ($loweredKey === "date"){
 					$newValue = new DateTime($value);
@@ -104,10 +145,12 @@
 					$newValue = EmailUtility::parseSemicolonDelimitedValue($value, 'content-type');
 				}elseif ($loweredKey === "content-disposition"){
 					$newValue = EmailUtility::parseSemicolonDelimitedValue($value, 'content-disposition');
+				}elseif ($loweredKey === "dkim-signature"){
+					$newValue = EmailUtility::parseSemicolonDelimitedValue($value, '');
 				}
 
 				// Always set headers as all lower case
-				$this->dataHeaders[$loweredKey] = $newValue;
+				$this->parsedDataHeaders[$loweredKey] = $newValue;
 			}
 		}
 
@@ -245,6 +288,7 @@
 			$this->parseDataHeaders();
 			$this->parseRawBody();
 			$this->decodeQuotedPrintableBodies();
+			$this->dkimVerificationResults = DKIMVerify::validateEnvelope($this);
 		}
 
 		public function __tostring(){
