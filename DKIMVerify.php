@@ -106,7 +106,14 @@
 				// Make an array of the signed header names but in lowered context for comparison (RFC requirement)
 				$signedHeaders_loweredHeaders = [];
 				foreach($signedHeaders as $hName){
-					$signedHeaders_loweredHeaders[] = mb_strtolower($hName);
+					// Do not add duplicate headers
+					// TODO It's possible duplicate headers are wanted - but that is way out of scope for now
+					// That would require the Mail to be reworked to somehow store duplicates even though it is key based
+					// IDEA If there is a duplicate header found when parsing raw headers, convert the parsedDataHeaders entry of that header to an array
+
+					if (array_search(mb_strtolower($hName), $signedHeaders_loweredHeaders) === false){
+						$signedHeaders_loweredHeaders[] = mb_strtolower($hName);
+					}
 				}
 
 				// The DKIM-Signature is always required to verify the header signature
@@ -166,7 +173,9 @@
 					// Must remove all whitespace at the end of every line EXCEPT for the \r\n
 					$bodyLines = explode("\r\n", $mail->rawBody);
 					foreach($bodyLines as $line){
-						$canonicalizedBody .= rtrim($line) . "\r\n";
+						$line = preg_replace("/[ \t]+$/m", "", $line);
+						$line = preg_replace("/[ \t]+/m", " ", $line) . "\r\n";
+						$canonicalizedBody .= $line;
 					}
 
 					// If the canonicalized body is just a CRLF, then remove it
@@ -178,7 +187,7 @@
 					}
 				}
 
-				Debug::log("DKIM canonicalized body ($bodyCanonicalizeType): $canonicalizedBody", Debug::DEBUG_LEVEL_LOW);
+				Debug::log("DKIM canonicalized body ($bodyCanonicalizeType): " . json_encode($canonicalizedBody), Debug::DEBUG_LEVEL_LOW);
 
 				// Hash the body and give raw output of the has, then base64 encode it
 				$hashedBody = base64_encode(hash($hashMethod, $canonicalizedBody, true));
