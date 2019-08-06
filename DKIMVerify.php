@@ -173,7 +173,9 @@
 					// Must remove all whitespace at the end of every line EXCEPT for the \r\n
 					$bodyLines = explode("\r\n", $mail->rawBody);
 					foreach($bodyLines as $line){
-						$canonicalizedBody .= rtrim($line) . "\r\n";
+						$line = preg_replace("/[ \t]+$/m", "", $line);
+						$line = preg_replace("/[ \t]+/m", " ", $line) . "\r\n";
+						$canonicalizedBody .= $line;
 					}
 
 					// If the canonicalized body is just a CRLF, then remove it
