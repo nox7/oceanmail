@@ -1,6 +1,8 @@
 <?php
 	/**
 	* Class DKIMVerify
+	*
+	* @author Garet C. Green
 	*/
 
 	require_once __DIR__ . "/Debug.php";
@@ -15,7 +17,7 @@
 		const REQUIRED_KEYS = ['v', 'a', 'b', 'bh', 'd', 'h', 's'];
 
 		/**
-		* Will determine if the mail was signed successfully with a DKIM signature
+		* Will determine if the mail's DKIM signature signifies it was not modified in transit to the destination
 		*
 		* @param Envelope $mail
 		* @return array[] With keys 'status'=> and 'reason'=>
@@ -25,6 +27,7 @@
 			$dkimSignature = $mail->getDataHeader("dkim-signature");
 			$publicKey; // Will be an array of the _domainkey TXT record
 
+			// Is the DKIM Signature an array (has it been parsed properly and is not empty)?
 			if (is_array($dkimSignature)){
 				Debug::log("Found DKIM signature: " . json_encode($dkimSignature), Debug::DEBUG_LEVEL_LOW);
 
@@ -61,6 +64,7 @@
 				Debug::log("Query type q= found as: " . json_encode($queryTypeData), Debug::DEBUG_LEVEL_LOW);
 
 				// DNS query
+				// The only valid value for q is dns/txt anyways
 				if ($queryTypeData[0] === "dns"){
 					Debug::log("Query type is DNS", Debug::DEBUG_LEVEL_LOW);
 					if ($queryTypeData[1] === "txt"){
@@ -105,8 +109,13 @@
 					$signedHeaders_loweredHeaders[] = mb_strtolower($hName);
 				}
 
-				// Canonicalize the headers
+				// The DKIM-Signature is always required to verify the header signature
+				$signedHeaders_loweredHeaders[] = "dkim-signature";
+
+				// Prepare an empty string for the canonicalized headers
 				$canonicalizedHeader = "";
+
+				// Canonicalize the headers
 				if ($headerCanonicalizeType === "simple"){
 
 					// The canonicalized headers must be in the order of signedHeaders, so this weird method was invented
@@ -114,15 +123,16 @@
 						foreach($mail->dataHeaders as $headerName=>$headerValue){
 							if (mb_strtolower($headerName) === $neededLoweredHeaderName){
 								$canonicalizedHeader .= sprintf("%s:%s\r\n", $headerName, rtrim($headerValue, "\r\n"));
+
+								// If the header being added is the DKIM-Signature, then the b= value must blanked
+								if ($neededLoweredHeaderName === "dkim-signature"){
+									$canonicalizedHeader = preg_replace("/b=[^\r\n]+/", "b=", $canonicalizedHeader);
+								}
 							}
 						}
 					}
 
 				}elseif ($headerCanonicalizeType === "relaxed"){
-					print_r($mail->dataHeaders);
-					print_r($signedHeaders_loweredHeaders);
-
-					$signedHeaders_loweredHeaders[] = "dkim-signature";
 
 					// The canonicalized headers must be in the order of signedHeaders, so this weird method was invented
 					foreach($signedHeaders_loweredHeaders as $neededLoweredHeaderName){
@@ -133,6 +143,7 @@
 								$headerValue = preg_replace("/[\s]{2,}/", " ", $headerValue);
 								$canonicalizedHeader .= sprintf("%s:%s\r\n", $neededLoweredHeaderName, trim(rtrim($headerValue, "\r\n")));
 
+								// If the header being added is the DKIM-Signature, then the b= value must blanked
 								if ($neededLoweredHeaderName === "dkim-signature"){
 									$canonicalizedHeader = preg_replace("/b=[^\r\n]+/", "b=", $canonicalizedHeader);
 								}
@@ -141,6 +152,7 @@
 					}
 				}
 
+				// The headers should not have a trailing CRLF
 				$canonicalizedHeader = rtrim($canonicalizedHeader, "\r\n");
 
 				Debug::log("DKIM canonicalized header ($headerCanonicalizeType): " . $canonicalizedHeader, Debug::DEBUG_LEVEL_LOW);
@@ -168,6 +180,7 @@
 
 				Debug::log("DKIM canonicalized body ($bodyCanonicalizeType): $canonicalizedBody", Debug::DEBUG_LEVEL_LOW);
 
+				// Hash the body and give raw output of the has, then base64 encode it
 				$hashedBody = base64_encode(hash($hashMethod, $canonicalizedBody, true));
 
 				Debug::log("Hashed body: $hashedBody", Debug::DEBUG_LEVEL_LOW);
@@ -187,14 +200,18 @@
 				$pemKey = sprintf("-----BEGIN PUBLIC KEY-----\n%s\n-----END PUBLIC KEY-----", wordwrap($publicKey, 64, "\n", true));
 				Debug::log("Public PEM is: \n" . $pemKey, Debug::DEBUG_LEVEL_LOW);
 
-				Debug::log("Base64 encoded b= is: " . json_encode($dkimSignature['b']), Debug::DEBUG_LEVEL_LOW);
-				Debug::log("Base64 decoded b= is: " . json_encode(base64_decode($dkimSignature['b'])), Debug::DEBUG_LEVEL_LOW);
-
+				// Get the integer constant of the necessary openSSL algorithm
 				$algorithm = constant("OPENSSL_ALGO_" . strtoupper($hashMethod));
+
+				// Verify that the canonicalized headers match the base64 decoded b= signature from the DKIM-Signature
 				$isSignatureCorrect = openssl_verify($canonicalizedHeader, base64_decode($dkimSignature['b']), $pemKey, $algorithm);
 
 				if ($isSignatureCorrect === 1){
-					Debug::log("Header signature matched!: " . $pemKey, Debug::DEBUG_LEVEL_LOW);
+					Debug::log("Header signature matched!", Debug::DEBUG_LEVEL_LOW);
+					return [
+						"status"=>"pass",
+						"reason"=>"With domain " . $dkimSignature['d'],
+					];
 				}else{
 					Debug::log("Header signature did not match computed PEM signature", Debug::DEBUG_LEVEL_LOW);
 					return [
@@ -205,6 +222,10 @@
 
 			}else{
 				Debug::log("No DKIM signature: $dkimSignature", Debug::DEBUG_LEVEL_LOW);
+				return [
+					"status"=>"permfail",
+					"reason"=>"No DKIM signature"
+				];
 			}
 
 
