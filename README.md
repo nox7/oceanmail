@@ -21,7 +21,7 @@ php server.php
 ```
 Then the server loop is running. Any incoming mail will now be accepted (the default accepting port that mail clients always send to is :25).
 
-You can also run the client.php script to test that mail is actually received when sent. Mailgun and GMail have also been tested and the server properly received and accepts mail from those applications.
+You can also run the client.php script to test that mail is actually received when sent. Mailgun, GMail, Microsoft Outlook have also been tested and the server properly received and accepts mail from those applications as well as verifies the DKIMs.
 ```php
 php client.php
 ```
