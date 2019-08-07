@@ -164,4 +164,31 @@
 			return $spfTerms;
 		}
 
+		/**
+		* Performs a CIDR check on an $ip against an IP $range that contains a subnet mask
+		*
+		* This will also return true if two IP addresses are simply equal
+		*
+		* @param string $ip
+		* @param string $range
+		* @return bool
+		* @see https://stackoverflow.com/questions/594112/matching-an-ip-to-a-cidr-mask-in-php-5
+		*/
+		public static function checkCIDRMatch(string $ip, string $range){
+			if (strpos($range, "/") !== false){
+				list($subnet, $bits) = explode('/', $range);
+				if ($bits === null || $bits === "") {
+					$bits = 32;
+				}
+			}else{
+				$bits = 32;
+				$subnet = &$range;
+			}
+			$ip = ip2long($ip);
+			$subnet = ip2long($subnet);
+			$mask = -1 << (32 - $bits);
+			$subnet &= $mask; // nb: in case the supplied subnet wasn't correctly aligned
+			return ($ip & $mask) == $subnet;
+		}
+
 	}
