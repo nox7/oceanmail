@@ -44,6 +44,8 @@
 			$spfTerms = self::parseSPFString($spfRecord);
 
 			print(var_dump($spfTerms));
+
+
 		}
 
 		/**
@@ -77,6 +79,8 @@
 		/**
 		* Provides an array of directives and modifiers from a raw SPF text record
 		*
+		* Mechanism and modifier names are all converted to lowercase here
+		*
 		* @param string $spfRecord
 		* @return string[]
 		*/
@@ -95,7 +99,7 @@
 					// Terms that do not contain these characters are mechanisms
 
 					// Does it have a qualifier?
-					$qualifier = "";
+					$qualifier = "+";
 					$mechanismName = "";
 
 					if (in_array($firstCharacter, ["+", "-", "?", "~"])){
@@ -108,7 +112,7 @@
 					$spfTerms[] = [
 						"type"=>"mechanism",
 						"qualifier"=>$qualifier,
-						"name"=>$mechanismName,
+						"name"=>strtolower($mechanismName),
 						"value"=>"",
 					];
 
@@ -118,7 +122,7 @@
 						// This is a mechanism
 
 						// Does it have a qualifier?
-						$qualifier = "";
+						$qualifier = "+";
 						$mechanismName = "";
 						$mechanismValue = "";
 
@@ -141,7 +145,7 @@
 						$spfTerms[] = [
 							"type"=>"mechanism",
 							"qualifier"=>$qualifier,
-							"name"=>$mechanismName,
+							"name"=>strtolower($mechanismName),
 							"value"=>$mechanismValue,
 						];
 
@@ -150,7 +154,7 @@
 						list($modifierName, $modifierValue) = explode("=", $part);
 						$spfTerms[] = [
 							"type"=>"modifier",
-							"name"=>$modifierName,
+							"name"=>strtolower($modifierName),
 							"value"=>$modifierValue,
 						];
 					}
