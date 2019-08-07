@@ -7,14 +7,21 @@
 
 	require_once __DIR__ . "/Debug.php";
 	require_once __DIR__ . "/DKIMVerify.php";
+	require_once __DIR__ . "/SPF.php";
 
 	/**
 	* The envelope (mail) received from the incoming server to be delivered to a local account
 	*/
 	class Envelope{
 
-		/** @var string The From address as sent by the SMTP FROM command */
-		public $fromAddress = "";
+		/** @var string The IP address that this mail was received from */
+		public $socketAddress = "";
+
+		/** @var string Hostname provided by HELO/EHLO command */
+		public $heloHostname = "";
+
+		/** @var array The From address as sent by the SMTP FROM command after being parsed by EmailUtility::parseEmaiLAddress() */
+		public $fromAddress = [];
 
 		/** @var string The recipient addresses found in the RCPT TO command */
 		public $recipientsAddresses = [];
@@ -289,6 +296,13 @@
 			$this->parseRawBody();
 			$this->decodeQuotedPrintableBodies();
 			$this->dkimVerificationResults = DKIMVerify::validateEnvelope($this);
+
+			$spfChecker = new SPF();
+			$spfChecker->checkHost(
+				$this->socketAddress,
+				$this->getDataHeader("from")['domain'],
+				$this->fromAddress['domain']
+			);
 		}
 
 		public function __tostring(){

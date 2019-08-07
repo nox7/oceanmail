@@ -87,6 +87,10 @@
 				// Set a maximum time to wait for input in socket_read()
 				socket_set_option($this->currentClientSocket, SOL_SOCKET, SO_RCVTIMEO, ["sec"=>2, "usec"=>0]);
 
+				// Get the IP and port of the connection
+				socket_getpeername($this->currentClientSocket, $peerIPAddress);
+				$this->currentEnvelope->socketAddress = $peerIPAddress;
+
 				Debug::log("Waiting for response from client", Debug::DEBUG_LEVEL_LOW);
 
 				$lineBuffer = ""; // The current input buffer
@@ -196,9 +200,11 @@
 					return false;
 				}elseif (self::isHeloCommand($loweredInput)){
 					Debug::log("HELO received", Debug::DEBUG_LEVEL_LOW);
+					$this->currentEnvelope->heloHostname = preg_replace("/\HELO\s*/", "", $loweredInput);
 					socket_write($this->currentClientSocket, $this->smtpResponseMessages['helo-response'], mb_strlen($this->smtpResponseMessages['helo-response']));
 				}elseif (self::isEhloCommand($loweredInput)){
 					Debug::log("EHLO received", Debug::DEBUG_LEVEL_LOW);
+					$this->currentEnvelope->heloHostname = preg_replace("/\EHLO\s*/", "", $loweredInput);
 					socket_write($this->currentClientSocket, $this->smtpResponseMessages['helo-response'], mb_strlen($this->smtpResponseMessages['helo-response']));
 				}elseif (self::isMailFromCommand($loweredInput)){
 					Debug::log("MAIL FROM received", Debug::DEBUG_LEVEL_LOW);
