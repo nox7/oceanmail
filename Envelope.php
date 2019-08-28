@@ -50,6 +50,9 @@
 		/** @var array The results of the DKIM verification process */
 		public $dkimVerificationResults = [];
 
+		/** @var string The result of an SPF check */
+		public $spfCheckResult = "none";
+
 		/**
 		* Gets the value of a header from parsedDataHeaders or a blank string
 		*
@@ -298,10 +301,9 @@
 			$this->dkimVerificationResults = DKIMVerify::validateEnvelope($this);
 
 			$spfChecker = new SPF();
-			$spfChecker->checkHost(
+			$this->spfCheckResult = $spfChecker->checkHost(
 				$this->socketAddress,
-				$this->getDataHeader("from")['domain'],
-				$this->fromAddress['domain']
+				$this->getDataHeader("from")['domain']
 			);
 		}
 
