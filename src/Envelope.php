@@ -171,7 +171,6 @@
 		*/
 		public function isMultipart(){
 			$contentType = $this->getDataHeader("content-type");
-			print_r($contentType);
 			if ($contentType !== "" && isset($contentType['content-type'])){
 				return preg_match("@multipart\/.+@i", $contentType['content-type']) === 1;
 			}
