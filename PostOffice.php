@@ -26,8 +26,9 @@
 		* @return void
 		*/
 		public function onMailDroppedOff(Envelope $mail){
-			Debug::log("Envelope received:\n" . $mail, Debug::DEBUG_LEVEL_MEDIUM);
-
-			print_r($mail->dkimVerificationResults);
+			// Debug::log("Envelope received:\n" . $mail, Debug::DEBUG_LEVEL_MEDIUM);
+			// print_r($mail->dkimVerificationResults);
+			
+			print(sprintf("SPF result: %s", $mail->spfCheckResult));
 		}
 	}
