@@ -26,6 +26,6 @@
 			// Debug::log("Envelope received:\n" . $mail, Debug::DEBUG_LEVEL_MEDIUM);
 			// print_r($mail->dkimVerificationResults);
 
-			print(sprintf("SPF result: %s", $mail->spfCheckResult));
+			print(sprintf("SPF result: %s\n", $mail->spfCheckResult));
 		}
 	}
