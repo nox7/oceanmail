@@ -102,3 +102,20 @@ if ($dkimResult['status'] === "pass"){
   // Something is wrong. Check $dkimResult['reason'] for more info
 }
 ```
+
+## Change Log
+```
+- 0.4.0:
+-- Added SPF verification
+-- Refactored files
+
+- 0.3.0
+-- DKIM verification implemented and tested on multiple large-name senders (Gmail, Outlook, MailGun)
+
+- 0.2.0
+-- Finish implementing commonly known SMTP commands
+-- Test receiving mail from large-name senders
+
+- 0.1.0
+-- Implement socket server and adjust to avoid hangs
+```
