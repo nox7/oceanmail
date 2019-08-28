@@ -1,4 +1,6 @@
-# 📮 OceanMail (v0.3.0) - Mail Exchange Server for PHP
+# 📮 OceanMail (v0.4.0) - Mail Exchange Server for PHP
+**Do not let the version fool you, this software is stable and usable for most instances of receiving email.**
+
 OceanMail is a standalone PHP-coded mail exchange server that you can run on your own Linux servers to handle incoming emails in an object-oriented way.
 
 This project hopes to remove boundaries of handling incoming emails such as having to use a 3rd party developer-friendly software (which requires payments) or giving up and just paying for GSuite/Microsoft mail.
@@ -42,4 +44,78 @@ The example output of an Envelope that was addressed to account1@example.com and
 ```
 account1
 hello
+```
+
+## Reading Headers From an Envelope
+You can read any header from an Envelope using `::getDataHeader()` like so
+```php
+$bccs = $mail->getDataHeader("bcc");
+```
+If a header **does not exist**, then an empty string is returned.
+
+## Check If an Envelope Is multipart
+To check if an envelope is a multipart (has multiple parts, such as text, html, or attachments like images or PDFs)
+```php
+$isMultipart = $mail->isMultipart();
+```
+## Get All Parts of an Envelope
+Any envelope that is multipart (remember, envelopes can have multiple envelopes in them and so can their children), you can loop through their child parts using the ```Envelope::multiparts``` property. It is an array of other Envelopes, or an empty array
+```php
+foreach($mail->multiparts as $childEnvelope){
+  print_r($childEnvelope->getDataHeader("content-type"));
+  
+  // Remember that even the childEnvelope could be multipart too!
+}
+```
+
+You can check the content-type of the child envelope
+```php
+foreach($mail->multiparts as $childEnvelope){
+  $contentType = $childEnvelope->getDataHeader("content-type");
+  if ($contentType !== ""){
+    if ($contentType === "text/html"){
+      $messageBody = $childEnvelope->body;
+      print($messageBody); // Prints the body of this text/html part
+    }
+  }
+}
+```
+
+## Check the Result of the SPF Check on the Envelope
+```php
+print($mail->spfCheckResult);
+// Can be "pass", "fail", "softfail", "permerror", "temperror", or "none"
+```
+You should never reject mail based on SPF, but you can lower the trust score of an envelope that fails an SPF check.
+
+## Check Whether the Envelope Passed the DKIM Verification
+DKIM signatures help you determine if the mail was modified in transit from the sender to your mail server. If a "pass" status is read, the mail was not modified and was securely sent to your mail server. If a "permfail" status is read, then you may need to check the reason for the permfail to determine if you should lower the quality score explicitly - or by how much.
+
+For instance, a reason of "No DKIM signature" doesn't mean the message was modified, but it also doesn't mean it wasn't. Simply, the sending server never signed the message.
+```php
+// The dkimResults is an array with two indices
+// "status"=> and "reason"=>
+$dkimResults = $mail->dkimVerificationResults;
+if ($dkimResult['status'] === "pass"){
+  // Secure message
+}elseif ($dkimResult['status'] === "permfail"){
+  // Something is wrong. Check $dkimResult['reason'] for more info
+}
+```
+
+## Change Log
+```
+- 0.4.0:
+-- Added SPF verification
+-- Refactored files
+
+- 0.3.0
+-- DKIM verification implemented and tested on multiple large-name senders (Gmail, Outlook, MailGun)
+
+- 0.2.0
+-- Finish implementing commonly known SMTP commands
+-- Test receiving mail from large-name senders
+
+- 0.1.0
+-- Implement socket server and adjust to avoid hangs
 ```
