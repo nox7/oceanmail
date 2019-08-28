@@ -1,6 +1,6 @@
 <?php
-	require_once "IncomingServer.php";
-	require_once "PostOffice.php";
+	require_once "src/IncomingServer.php";
+	require_once "src/PostOffice.php";
 
 	$poBox = new PostOffice();
 	$server = new IncomingServer();
