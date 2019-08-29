@@ -81,6 +81,7 @@
 						}
 					}elseif ($termName === "ip4"){
 						if (IPUtils::checkIP($senderIP, $termValue)){
+							Debug::log("SPF CIDR matched $termValue to sender $senderIP", Debug::DEBUG_LEVEL_LOW);
 							return self::getResultStringFromQualifier($termQualifier);
 						}else{
 							Debug::log("IP $termValue failed to CIDR match for sender IP $senderIP", Debug::DEBUG_LEVEL_LOW);
@@ -89,6 +90,7 @@
 						// Is the $senderIP even an IPv6?
 						if ($senderIsIPv6){
 							if (IPUtils::checkIP($senderIP, $termValue)){
+								Debug::log("SPF CIDR matched $termValue to sender $senderIP", Debug::DEBUG_LEVEL_LOW);
 								return self::getResultStringFromQualifier($termQualifier);
 							}else{
 								Debug::log("IP $termValue failed to CIDR match for sender IP $senderIP", Debug::DEBUG_LEVEL_LOW);
@@ -99,6 +101,7 @@
 						$aRecords = self::getARecords($domain);
 						foreach($aRecords as $ipRecord){
 							if (IPUtils::checkIP($senderIP, $ipRecord)){
+								Debug::log("SPF CIDR matched $ipRecord to sender $senderIP", Debug::DEBUG_LEVEL_LOW);
 								return self::getResultStringFromQualifier($termQualifier);
 							}
 						}
@@ -112,7 +115,10 @@
 								++$lookupCount;
 								$aRecords = self::getARecords($mxDomain);
 								foreach($aRecords as $ipRecord){
-									return self::getResultStringFromQualifier($termQualifier);
+									if (IPUtils::checkIP($senderIP, $ipRecord)){
+										Debug::log("SPF CIDR matched $ipRecord to sender $senderIP", Debug::DEBUG_LEVEL_LOW);
+										return self::getResultStringFromQualifier($termQualifier);
+									}
 								}
 							}
 						}
@@ -130,6 +136,7 @@
 						}
 					}elseif ($termName === "all"){
 						// When encountering "all" the loop should break no matter what
+						Debug::log("Hit `all` without a match, sending check result: " . self::getResultStringFromQualifier($termQualifier), Debug::DEBUG_LEVEL_LOW);
 						return self::getResultStringFromQualifier($termQualifier);
 					}
 				}
