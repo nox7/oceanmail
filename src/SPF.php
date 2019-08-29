@@ -142,12 +142,8 @@
 					if ($termName === "redirect"){
 						// Basically the same as include: - but processed at the end and before all
 						if ($termValue !== ""){
-							// Recursively check host and try to find a matching IPv4 in this include
-							$result = $this->checkHost($senderIP, $termValue, true);
-							if ($result === "pass"){
-								// Found a result that validates
-								return "pass";
-							}
+							// Redirect all of the final results to this redirection value
+							return $this->checkHost($senderIP, $termValue, true);
 						}
 					}
 				}
