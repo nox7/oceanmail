@@ -1,4 +1,4 @@
-# 📮 OceanMail (v0.4.0) - Mail Exchange Server for PHP
+# 📮 OceanMail (v0.4.1) - Mail Exchange Server for PHP
 **Do not let the version fool you, this software is stable and usable for most instances of receiving email.**
 
 OceanMail is a standalone PHP-coded mail exchange server that you can run on your own Linux servers to handle incoming emails in an object-oriented way.
@@ -105,6 +105,9 @@ if ($dkimResult['status'] === "pass"){
 
 ## Change Log
 ```
+- 0.4.0:
+-- Implemented redirect and correct include SPF modifier/mechanism
+
 - 0.4.0:
 -- Added SPF verification
 -- Refactored files
