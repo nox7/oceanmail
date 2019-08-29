@@ -138,6 +138,7 @@
 						return self::getResultStringFromQualifier($termQualifier);
 					}
 				}elseif ($term['type'] === "modifier"){
+					$termValue = trim($term['value']);
 					if ($termName === "redirect"){
 						// Basically the same as include: - but processed at the end and before all
 						if ($termValue !== ""){
