@@ -7,6 +7,12 @@ This project hopes to remove boundaries of handling incoming emails such as havi
 
 OceanMail is aimed at developers who want to create their own inbox application or host an email server and perform custom logic (such as storing emails in an SQL database for easier management). Currently, most developers simply setup an ancient Postfix rig which revolves around confusing and outdated configuration formats. Even then, it isn't always clear how to setup exact configurations.
 
+### What is it for?
+
+OceanMail is for developers. If you'd like to make a website and accepts emails, but then do something more advanced with them through a PHP API (like store them in a database and then allow your users to check email on their accounts from your own UI system).
+
+This software **does not** implement checking email over SMTP (like IMAP or any AUTH SMTP commands). Such methods are outdated and not intuitive. Alternatively, you should use OceanMail to make your own API after storing emails in a database to be read in an easier way.
+
 ## ✅ Feature List
 - Supports all incoming mail from EHLO or HELO mail clients on port :25
 - Parses incoming mail into a workable PHP object for ease of use
