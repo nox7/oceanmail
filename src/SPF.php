@@ -65,8 +65,11 @@
 
 			$domainIsAllowed = false; // Whether or not this function determined the senderIP can explicitly send on behalf of domain
 
+			print(var_dump($spfTerms));
+
 			foreach($spfTerms as $term){
 				$termName = trim($term['name']);
+				Debug::log("Iterating SPF term: " . $termName, Debug::DEBUG_LEVEL_LOW);
 				if ($term['type'] === "mechanism"){
 					$termQualifier = $term['qualifier'];
 					$termValue = trim($term['value']);
