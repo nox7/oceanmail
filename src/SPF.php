@@ -65,8 +65,11 @@
 
 			$domainIsAllowed = false; // Whether or not this function determined the senderIP can explicitly send on behalf of domain
 
+			print(var_dump($spfTerms));
+
 			foreach($spfTerms as $term){
 				$termName = trim($term['name']);
+				Debug::log("Iterating SPF term: " . $termName, Debug::DEBUG_LEVEL_LOW);
 				if ($term['type'] === "mechanism"){
 					$termQualifier = $term['qualifier'];
 					$termValue = trim($term['value']);
@@ -76,6 +79,11 @@
 							$result = $this->checkHost($senderIP, $termValue, true);
 							if ($result === "pass"){
 								// Found a result that validates
+
+								// TODO Because "include" is a modifier, I believe it should check the qualifier and if the $result is a pass, then the qualifier will determine the "final" result.
+								// Such as -include:_spf.example.com
+								// ^^ if that include passes, then the qualifier of the include should be checked and a "fail" should be returned
+								// Currently does not do this - is this desirable?
 								return "pass";
 							}
 						}
@@ -124,7 +132,14 @@
 						}
 					}elseif ($termName === "ptr"){
 						// RFC says no to this one
-					}elseif ($termName === "redirect"){
+					}elseif ($termName === "all"){
+						// When encountering "all" the loop should break no matter what
+						Debug::log("Hit `all` without a match, sending check result: " . self::getResultStringFromQualifier($termQualifier), Debug::DEBUG_LEVEL_LOW);
+						return self::getResultStringFromQualifier($termQualifier);
+					}
+				}elseif ($term['type'] === "modifier"){
+					$termValue = trim($term['value']);
+					if ($termName === "redirect"){
 						// Basically the same as include: - but processed at the end and before all
 						if ($termValue !== ""){
 							// Recursively check host and try to find a matching IPv4 in this include
@@ -134,10 +149,6 @@
 								return "pass";
 							}
 						}
-					}elseif ($termName === "all"){
-						// When encountering "all" the loop should break no matter what
-						Debug::log("Hit `all` without a match, sending check result: " . self::getResultStringFromQualifier($termQualifier), Debug::DEBUG_LEVEL_LOW);
-						return self::getResultStringFromQualifier($termQualifier);
 					}
 				}
 			}
@@ -277,7 +288,7 @@
 						$qualifier = $firstCharacter;
 						$mechanismName = substr($part, 1);
 					}else{
-						$mechanismName = &$part;
+						$mechanismName = $part;
 					}
 
 					$spfTerms[] = [
