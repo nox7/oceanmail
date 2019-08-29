@@ -118,6 +118,16 @@
 						}
 					}elseif ($termName === "ptr"){
 						// RFC says no to this one
+					}elseif ($termName === "redirect"){
+						// Basically the same as include: - but processed at the end and before all
+						if ($termValue !== ""){
+							// Recursively check host and try to find a matching IPv4 in this include
+							$result = $this->checkHost($senderIP, $termValue, true);
+							if ($result === "pass"){
+								// Found a result that validates
+								return "pass";
+							}
+						}
 					}elseif ($termName === "all"){
 						// When encountering "all" the loop should break no matter what
 						return self::getResultStringFromQualifier($termQualifier);
