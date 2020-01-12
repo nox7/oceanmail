@@ -111,7 +111,7 @@ if ($dkimResult['status'] === "pass"){
 
 ## Change Log
 ```
-- 0.4.0:
+- 0.4.1:
 -- Implemented redirect and correct include SPF modifier/mechanism
 
 - 0.4.0:
